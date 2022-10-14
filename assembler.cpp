@@ -16,10 +16,10 @@ FILE * assembler (info_prog * prog, char * arg_console)
     const int version = 1;
     prog -> size_file = size_file(arg_console);
 
-    printf ("size_file = %d\n", prog->size_file);
+    // printf ("size_file = %d\n", prog->size_file);
 
     prog -> buf = (char *) calloc ((prog->size_file)+1, sizeof(char));
-    printf ("prog -> buf = %p\n", prog -> buf);
+    // printf ("prog -> buf = %p\n", prog -> buf);
     fread (prog -> buf, (prog->size_file)+1, sizeof(char), prog->file_with_code);
 
     (prog -> buf)[prog->size_file] = '\0';
@@ -31,8 +31,8 @@ FILE * assembler (info_prog * prog, char * arg_console)
     // check_buf(prog->buf);
 
     FILE * asm_text = open_asm_text();
-    printf ("prog->n_strings = %d\n", prog->n_strings);
-    printf ("asm_text before for = %p\n", asm_text);
+    // printf ("prog->n_strings = %d\n", prog->n_strings);
+    // printf ("asm_text before for = %p\n", asm_text);
 
     // for (int i = 0; i < prog->n_strings; i++)
     // {
@@ -126,9 +126,10 @@ int correct_buf (char * buf, int n_elements)
 	
 	for (int i = 0; i < n_elements; i++)
 	{
-		if (buf[i] == '\n')
+		if (buf[i] == '\n' || buf[i] == ';')
 		{
-			buf[i] = '\0';
+			//buf[i] = '\0';
+            buf[i] = '\0';
             // printf ("buf[i+1] = %c\n", buf[i+1]);
             // if (buf[i+2] != ' ')
 			n_strings++;

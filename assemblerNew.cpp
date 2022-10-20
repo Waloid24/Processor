@@ -6,7 +6,9 @@ FILE * assembler (info_prog * prog, char * arg_console)
     
     char * arrStrings = createArrStrings(prog, arg_console);
     arrayFiles[0] = createBinFile (arrStrings, prog);
-    arrayFiles[1] = createTextFile (prog, );
+
+
+    //arrayFiles[1] = createTextFile (prog, );
 
     return arrayFiles;
 }
@@ -27,7 +29,7 @@ char * createArrStrings (info_prog * prog, char * arg_console)
 
     //check_buf(prog->buf);
 
-    char * array_strings = arrayPointerToStrings (prog->n_strings, sizeof(char *));
+    char ** array_strings = arrayPointerToStrings (prog->n_strings, sizeof(char *));
 
     filling_struct (array_strings, prog->buf, prog->size_file);
 }
@@ -91,16 +93,16 @@ int correct_buf (char * buf, int n_elements)  //заменить в коде в�
 	return n_strings;
 }
 
-char * arrayPointerToStrings (int n_strings, size_t size)
+char ** arrayPointerToStrings (int n_strings, size_t size)
 {
-	char * array = (char *)calloc (n_strings, size);
+	char ** array = (char **)calloc (n_strings, size);
 	MY_ASSERT (array == NULL, "Memory allocation error\n");
 	return array;
 }
 
-void filling_struct (char * arrPtrsToStrings, char * buf, int n_elem) 
+void filling_struct (char ** arrPtrsToStrings, char * buf, int n_elem) 
 {
-	arrPtrsToStrings[0].str = buf;
+	arrPtrsToStrings[0] = buf;
 	for (int num_sym = 0, j = 0; num_sym < n_elem && *buf != EOF; num_sym++)
 	{
 		//arr_struct_string
@@ -110,8 +112,8 @@ void filling_struct (char * arrPtrsToStrings, char * buf, int n_elem)
             {
                 buf++;
             }
-			arrPtrsToStrings[j+1].str = buf;
-            printf ("arrPtrsToStrings[%d].str = %s\n", j, arrPtrsToStrings[j].str);
+			arrPtrsToStrings[j+1] = buf;
+            printf ("arrPtrsToStrings[%d].str = %s\n", j, arrPtrsToStrings[j]);
 			j++;
 		}
 		buf++;
@@ -123,32 +125,38 @@ void filling_struct (char * arrPtrsToStrings, char * buf, int n_elem)
     
 // }
 
-FILE * createBinFile (char * arrStrs, info_prog * prog, )
+FILE * createBinFile (char ** arrStrs, info_prog * prog, )
 {
-
-
-    int * code = calloc (prog->n_strings * 3, sizeof(int)); //возможно, будет мало места.
+    char * code = (char *) calloc (prog->n_strings * 3, sizeof(int)); //возможно, будет мало места.
     #define DEF_CMD(nameCmd, countLetters, numCmd, isArg)\
         if (my_strcmp (cmd, #nameCmd) == 0)\
         {\
-            if (isArg)\
-            {\
-                countArgs++;\
-                getArg (&(code[ip++]), array_strings[i].str + countLetters, &ip, numCmd);\ //ДОПИСАТЬ АРГУМЕНТЫ
-            }\
-            else\
-            {\
-                code[ip++] = CMD_##nameCmd;\
-            }\
+            // code[ip++] = CMD_##nameCmd;
+            // if (isArg)\
+            // {\
+            //     countArgs++;\
+            //     getArg (&(code[ip++]), array_strings[i].str + countLetters, &ip, numCmd);\ //ДОПИСАТЬ АРГУМЕНТЫ
+            // }
+
+            if (isArg)
+            {
+                countArgs++;
+                getArg (&(code[ip++]), arrStrs[i], countLetters, numCmd);
+            }
+            else 
+                code[ip++] = CMD_##nameCmd;
+
         }\
         else
 
     char * cmd = (char *) calloc (STANDART_SIZE, sizeof(char));
     int countArgs = 0;
-    for (int i = 0, ip = -1; i < prog->n_strings; i++, ip++)
+    for (int i = 0, ip = -1; i < prog->n_strings; i++)
     {
-        sscanf (array_strings[i].str, "%s", cmd);
-        
+        sscanf (arrStrs[i], "%s", cmd);
+
+        isMark ();
+
         #include "cmd.h"
         {
             printf ("This command is not defined.\n");
@@ -158,103 +166,262 @@ FILE * createBinFile (char * arrStrs, info_prog * prog, )
     #undef DEF_CMD
 }
 
-void getArg (int * code, char * str, int * register, int * ram, int * i, int numCmd)
+void getArg (unsigned char * code, char * str_text_code, int countLetters, int numCmd)
 {
-    char * firstBracket = nullptr;
-
-    if ((firstBracket = strchr (str, '[')) != nullptr)
+	char * firstBracket = nullptr;
+    if ((firstBracket = strchr (str_text_code, '[')) != nullptr)
     {
+        areSquareBrackets(code, firstBracket, numCmd);
+    }
+    else
+	{
+		printf ("There isn't bracket\n");
+        otherForm(code, str_text_code, countLetters, numCmd);
+	}
+		
+}
 
+void otherForm (unsigned char * code, char * str_text_code, int countLetters, int numCmd)
+{
+    printf ("numCmd = %d\n", numCmd);
 
-        char * secondBracket = strchr (str, ']');
+	char * reg  = (char *) calloc (3, sizeof(char));
+    MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
 
-        //(char * ptrSym = strchr (firstBracket+1, 'r')) != nullptr && ptrSym < secondBracket
+    char * trash = (char *) calloc (3, sizeof(char));
+    MY_ASSERT (trash == nullptr, "func GetArgument: it's impossible to read other symbols");
 
-        char * reg  = (char *) calloc (3, sizeof(char));
-        MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
-        char * trash = (char *) calloc (3, sizeof(char));
-        MY_ASSERT (trash == nullptr, "func GetArgument: it's impossible to read other symbols");
-	    int num = -1;
+	int num = -1;
+    char * ptrToArg = skipSpace (str_text_code, countLetters);
 
+	printf ("*ptrToArg = %c\n", *ptrToArg);
 
-        if (my_strcmp (firstBracket+1, "r") == 0)
-        {
-            sscanf (firstBracket+1, "%[rabcdx]%[ +]%d", reg, trash, &num); //обработка push [rax + 5]
-        }
-        else 
-        {
-            sscanf (firstBracket+1, "%d%[ +]%[rabcdx]", &num, trash, reg); //обработка push [5 + rax] 
-        }
-
-        MY_ASSERT (num == -1 && reg == 0, "Your argument in square brackets are incorrect");
-
-        if (num == -1 && reg != 0) //на всякий случай        //ситуация вида push [rax] и pop [rax]
-        {
-            if      (my_strcmp (reg, "rax") == 0) int count_reg = RAX;
-            else if (my_strcmp (reg, "rbx") == 0) int count_reg = RBX;
-            else if (my_strcmp (reg, "rcx") == 0) int count_reg = RCX;
-            else if (my_strcmp (reg, "rdx") == 0) int count_reg = RDX;
-            else                                  MY_ASSERT (1, "The case is specified incorrectly");
-
-
-            if (numCmd == CMD_PUSH)
-            {
-                int numInRegister = register[count_reg];
-                int numInRAM      = ram[numInRegister];
-                Push (stk, numInRAM); //должны обработать аргумент и положить его и в массив с кодом, и в массив стэка? получается, нужно добавить аргумент?
-            }
-
-            if (numCmd == CMD_POP)
-            {
-                int lastStackNum   = Pop(stk);
-                int numInRegister  = register[count_reg];
-                ram[numInRegister] = lastStackNum; //проверить, доступен ли вообще такой индекс
-            }
-        }
+    if (my_strcmp (ptrToArg, "r") == 0)
+    {
+		printf ("There is register\n");
+        sscanf (ptrToArg, "%[rabcdx]%[ +]%d", reg, trash, &num); //обработка push rax + 5
+    }
+    else 
+    {
+		printf ("There isn't register\n");
+        sscanf (ptrToArg, "%d%[ +]%[rabcdx]", &num, trash, reg); //обработка push 5 + rax 
+    }
     
-        else if (reg == 0 && num != -1) //ситуация вида push [5] и pop [5]
-        {
-            if (numCmd == CMD_PUSH)
-            {  
-                int numInRAM = ram[num];
-                Push (stk, numInRAM);
-            }
-            
-            if (numCmd == CMD_POP)  //if менять на else
-            {
-                int lastStackNum = Pop(stk);
-                ram[num]         = lastStackNum;
-            }
-        }
-        else //ситуация вида push [5 + rax] или pop [5 + rax] или [rax + 5]
-        {
-            if      (my_strcmp (reg, "rax") == 0) int count_reg = RAX;
-            else if (my_strcmp (reg, "rbx") == 0) int count_reg = RBX;
-            else if (my_strcmp (reg, "rcx") == 0) int count_reg = RCX;
-            else if (my_strcmp (reg, "rdx") == 0) int count_reg = RDX;
-            else                                  MY_ASSERT (1, "The case is specified incorrectly");
+    MY_ASSERT (num == -1 && *reg == 0, "Your argument in square brackets are incorrect");
 
-            if (numCmd == CMD_PUSH)
-            {
-                int numInRegister = register[count_reg];
-                int numInRAM      = ram[numInRegister + num];
-                Push (stk, numInRAM);
-            }
+	printf ("Your reg = %s, trash = %s, num = %d\n", reg, trash, num);
 
-            if (numCmd == CMD_POP)
-            {
-                int lastStackNum   = Pop(stk);
-                int numInRegister  = register[count_reg];
-                ram[numInRegister + num] = lastStackNum;
-            }
+    if (num == -1 && *reg != 0) //на всякий случай        //ситуация вида push rax и pop rax 
+    {
+		printf ("reg != 0 RRRRRRRRRRRRR\n");
+        char count_reg = 0;
+        if      (my_strcmp (reg, "rax") == 0) count_reg = (char) RAX;
+        else if (my_strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
+        else if (my_strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
+        else if (my_strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
+        else                                  MY_ASSERT (1, "The case is specified incorrectly");
+
+
+        if (numCmd == CMD_PUSH) //0000 | 0000
+        {                       //0100 | 0001
+            *code = 65;
+            code++;
+            *code = count_reg;
         }
+
+        else if (numCmd == CMD_POP) //0100 | 0010
+        {
+            *code = 66;
+            code++;
+            *code = count_reg;
+        }
+        else //это случай jmp     //0100 | 1000
+        {
+            *code = 72;
+            code++;
+            *code = count_reg;
+        }
+
     }
 
+    else if (*reg == 0 && num != -1) //ситуация вида push 5 и pop 5
+    {
+		printf ("this if\n");
+        if (numCmd == CMD_PUSH) //0010 | 0001
+        {  
+			printf ("command is push 111\n");
+            *code = 33;
+            code++;
+            *((int *) code) = num;
+        }
+            
+        else if (numCmd == CMD_POP)  //if менять на else //0010 | 0010
+        {
+			printf ("command is pop 222\n");
+            *code = 34;
+            code++;
+            *((int *) code) = num;
+        }
+        else //это jmp     //0010 | 1000
+		{
+			printf ("command is jmp 333\n");
+			*code = 40;
+            code++;
+            *((int *) code) = num;
+		}
+            
+    }
+    else //ситуация вида push 5 + rax, или pop 5 + rax, или rax + 5
+    {
+        char count_reg = 0;
+        if      (my_strcmp (reg, "rax") == 0) count_reg = (char) RAX;
+        else if (my_strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
+        else if (my_strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
+        else if (my_strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
+        else                                  MY_ASSERT (1, "The case is specified incorrectly");
+
+        if (numCmd == CMD_PUSH) //0110 | 0001
+        {
+            *code = 97;
+            code++;
+            *((int *) code)  = num;
+            code++;
+            *((char *) code) = count_reg;
+        }
+
+        else if (numCmd == CMD_POP) //0110 | 0010
+        {
+            *code = 98;
+            code++;
+            *((int *) code)  = num;
+            code++;
+            *((char *) code) = count_reg;
+        }
+        else //0110 | 1000
+        {
+            *code = 104;
+            code++;
+            *((int *) code)  = num;
+            code++;
+            *((char *) code) = count_reg;
+        }
+    }
     free (reg);
     free (trash);
 }
 
+char * skipSpace (char * str_text_code, int countLetters)
+{
+    char * aftercommand = str_text_code + countLetters;
+	int i = 0;
+    for (; aftercommand[i] == ' '; i++)
+    {
+        ;
+    }
+    return &(aftercommand[i]);
+}
 
+void areSquareBrackets (unsigned char * code, char * firstBracket, int numCmd)
+{ 
+	printf ("Works areSquareBrackets func\n");
+	printf ("numCmd = %d\n", numCmd);
+
+    char * reg  = (char *) calloc (3, sizeof(char));
+    MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
+    char * trash = (char *) calloc (3, sizeof(char));
+    MY_ASSERT (trash == nullptr, "func GetArgument: it's impossible to read other symbols");
+	int num = -1;
+
+    if (my_strcmp (firstBracket+1, "r") == 0)
+    {
+        sscanf (firstBracket+1, "%[rabcdx]%[ +]%d", reg, trash, &num); //обработка push [rax + 5]
+    }
+    else 
+    {
+        sscanf (firstBracket+1, "%d%[ +]%[rabcdx]", &num, trash, reg); //обработка push [5 + rax] 
+    }
+
+    MY_ASSERT (num == -1 && *reg == 0, "Your argument in square brackets are incorrect");
+
+    if (num == -1 && *reg != 0) //на всякий случай        //ситуация вида push [rax] и pop [rax]
+    {
+        char count_reg = 0;
+        if      (my_strcmp (reg, "rax") == 0) count_reg = (char) RAX;
+        else if (my_strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
+        else if (my_strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
+        else if (my_strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
+        else                                  MY_ASSERT (1, "The case is specified incorrectly");
+
+
+        if (numCmd == CMD_PUSH) //0000 | 0000
+        {                       //1100 | 0001
+			printf ("There is push 222\n");
+            *code = 193;
+            code++;
+            *code = count_reg;
+        }
+
+        if (numCmd == CMD_POP) //1100 | 0010
+        {
+			printf ("There is pop 222\n");
+            *code = 194;
+            code++;
+            *code = count_reg;
+        }
+    }
+    
+    else if (*reg == 0 && num != -1) //ситуация вида push [5] и pop [5]
+    {
+        if (numCmd == CMD_PUSH) //1010 | 0001
+        {
+			printf ("There is push 333\n");
+
+            *code = 161;
+
+            code++;
+            *((unsigned int *) code) = num;
+        }
+            
+        if (numCmd == CMD_POP)  //if менять на else //1010 | 0010
+        {
+			printf ("There is pop 333\n");
+            *code = 162;
+            code++;
+            *((unsigned int *) code) = num;
+        }
+    }
+    else //ситуация вида push [5 + rax] или pop [5 + rax] или [rax + 5]
+    {
+		char count_reg = 0;
+        if      (my_strcmp (reg, "rax") == 0) count_reg = (char) RAX;
+        else if (my_strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
+        else if (my_strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
+        else if (my_strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
+        else                                  MY_ASSERT (1, "The case is specified incorrectly");
+
+        if (numCmd == CMD_PUSH) //1110 | 0001
+        {
+			printf ("There is push 444\n");
+            *code = 225;
+            code++;
+            *((unsigned int *) code)  = num;
+            code++;
+            *((unsigned char *) code) = count_reg;
+        }
+
+        if (numCmd == CMD_POP) //1110 | 0010
+        {
+			printf ("There is pop 444\n");
+            *code = 226;
+            code++;
+            *((unsigned int *) code)  = num;
+            code++;
+            *((unsigned char *) code) = count_reg;
+        }
+    }
+    free (reg);
+    free (trash);
+}
 
 int my_strcmp (const char * string1, const char * string2)
 {

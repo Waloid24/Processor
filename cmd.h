@@ -25,15 +25,15 @@
 
 
 
-DEF_CMD (PUSH, 4, N_PUSH, YES)
-DEF_CMD (POP,  3, N_POP,  YES)
-DEF_CMD (ADD,  3, N_ADD,  NO )
-DEF_CMD (SUB,  3, N_SUB,  NO )
-DEF_CMD (MUL,  3, N_MUL,  NO )
-DEF_CMD (DIV,  3, N_DIV,  NO )
-DEF_CMD (OUT,  3, N_OUT,  NO )
-DEF_CMD (JMP,  3, N_JMP,  YES)
-DEF_CMD (HLT,  3, N_HLT,  NO )
+DEF_CMD (PUSH, 4, CMD_PUSH, YES)
+DEF_CMD (POP,  3, CMD_POP,  YES)
+DEF_CMD (ADD,  3, CMD_ADD,  NO )
+DEF_CMD (SUB,  3, CMD_SUB,  NO )
+DEF_CMD (MUL,  3, CMD_MUL,  NO )
+DEF_CMD (DIV,  3, CMD_DIV,  NO )
+DEF_CMD (OUT,  3, CMD_OUT,  NO )
+DEF_CMD (JMP,  3, CMD_JMP,  YES)
+DEF_CMD (HLT,  3, CMD_HLT,  NO )
 
 
 // getArgs (char * buf, char * code, int * ip)

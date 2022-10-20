@@ -20,7 +20,7 @@ typedef struct {
 typedef enum  {
     CMD_HLT  = 0,
     CMD_PUSH = 1,
-    CMD_POP  = 2
+    CMD_POP  = 2,
     CMD_ADD  = 3,
     CMD_SUB  = 4,
     CMD_MUL  = 5,
@@ -35,3 +35,12 @@ enum {
     RCX = 2,
     RDX = 3
 };
+
+typedef int elem_t;
+
+typedef struct {
+    elem_t * data;
+    int   n_memb;
+    int   capacity;
+
+} stack_t;

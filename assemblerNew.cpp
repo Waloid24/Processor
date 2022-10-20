@@ -125,17 +125,21 @@ void filling_struct (char * arrPtrsToStrings, char * buf, int n_elem)
 
 FILE * createBinFile (char * arrStrs, info_prog * prog, )
 {
+
+
     int * code = calloc (prog->n_strings * 3, sizeof(int)); //возможно, будет мало места.
     #define DEF_CMD(nameCmd, countLetters, numCmd, isArg)\
         if (my_strcmp (cmd, #nameCmd) == 0)\
         {\
-            code[ip++] = CMD_##nameCmd;\
             if (isArg)\
             {\
                 countArgs++;\
-                getArg (&(code[ip++]), array_strings[i].str + countLetters, &ip);\ //ДОПИСАТЬ АРГУМЕНТЫ
+                getArg (&(code[ip++]), array_strings[i].str + countLetters, &ip, numCmd);\ //ДОПИСАТЬ АРГУМЕНТЫ
             }\
-            code[i++] = '\n';\
+            else\
+            {\
+                code[ip++] = CMD_##nameCmd;\
+            }\
         }\
         else
 
@@ -154,18 +158,24 @@ FILE * createBinFile (char * arrStrs, info_prog * prog, )
     #undef DEF_CMD
 }
 
-void getArg (int * code, char * str, int * register, int * ram, int * i)
+void getArg (int * code, char * str, int * register, int * ram, int * i, int numCmd)
 {
     char * firstBracket = nullptr;
+
     if ((firstBracket = strchr (str, '[')) != nullptr)
     {
+
+
         char * secondBracket = strchr (str, ']');
 
         //(char * ptrSym = strchr (firstBracket+1, 'r')) != nullptr && ptrSym < secondBracket
 
         char * reg  = (char *) calloc (3, sizeof(char));
+        MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
         char * trash = (char *) calloc (3, sizeof(char));
+        MY_ASSERT (trash == nullptr, "func GetArgument: it's impossible to read other symbols");
 	    int num = -1;
+
 
         if (my_strcmp (firstBracket+1, "r") == 0)
         {
@@ -175,8 +185,10 @@ void getArg (int * code, char * str, int * register, int * ram, int * i)
         {
             sscanf (firstBracket+1, "%d%[ +]%[rabcdx]", &num, trash, reg); //обработка push [5 + rax] 
         }
+
         MY_ASSERT (num == -1 && reg == 0, "Your argument in square brackets are incorrect");
-        if (num == -1 && reg != 0) //на всякий случай        //ситуация вида push [rax]
+
+        if (num == -1 && reg != 0) //на всякий случай        //ситуация вида push [rax] и pop [rax]
         {
             if      (my_strcmp (reg, "rax") == 0) int count_reg = RAX;
             else if (my_strcmp (reg, "rbx") == 0) int count_reg = RBX;
@@ -184,28 +196,57 @@ void getArg (int * code, char * str, int * register, int * ram, int * i)
             else if (my_strcmp (reg, "rdx") == 0) int count_reg = RDX;
             else                                  MY_ASSERT (1, "The case is specified incorrectly");
 
-            int numInRegister = register[count_reg];
-            int numInRAM      = ram[numInRegister];
 
-            Push (code, numInRAM)
-        }
-        else if (reg == 0 && num != -1) //ситуация вида push [5]
-        {
-            int numInRAM = ram[num];
-            Push (code, numInRAM);
-        }
-        else //ситуация вида push [5 + rax] или push [rax + 5]
-        {
-            if      (my_strcmp (reg, "rax") == 0) int count_reg = RAX;
-            else if (my_strcmp (reg, "rbx") == 0) int count_reg = RBX;
-            else if (my_strcmp (reg, "rcx") == 0) int count_reg = RCX;
-            else if (my_strcmp (reg, "rdx") == 0) int count_reg = RDX;
-            else                                  MY_ASSERT (1, "The case is specified incorrectly");
+            if (numCmd == CMD_PUSH)
+            {
+                int numInRegister = register[count_reg];
+                int numInRAM      = ram[numInRegister];
+                Push (stk, numInRAM); //должны обработать аргумент и положить его и в массив с кодом, и в массив стэка? получается, нужно добавить аргумент?
+            }
 
-            int numInRegister = register[count_reg];
-            int numInRAM      = ram[numInRegister + num];
+            if (numCmd == CMD_POP)
+            {
+                int lastStackNum   = Pop(stk);
+                int numInRegister  = register[count_reg];
+                ram[numInRegister] = lastStackNum; //проверить, доступен ли вообще такой индекс
+            }
+        }
+    
+        else if (reg == 0 && num != -1) //ситуация вида push [5] и pop [5]
+        {
+            if (numCmd == CMD_PUSH)
+            {  
+                int numInRAM = ram[num];
+                Push (stk, numInRAM);
+            }
             
-            Push (code, numInRAM);
+            if (numCmd == CMD_POP)  //if менять на else
+            {
+                int lastStackNum = Pop(stk);
+                ram[num]         = lastStackNum;
+            }
+        }
+        else //ситуация вида push [5 + rax] или pop [5 + rax] или [rax + 5]
+        {
+            if      (my_strcmp (reg, "rax") == 0) int count_reg = RAX;
+            else if (my_strcmp (reg, "rbx") == 0) int count_reg = RBX;
+            else if (my_strcmp (reg, "rcx") == 0) int count_reg = RCX;
+            else if (my_strcmp (reg, "rdx") == 0) int count_reg = RDX;
+            else                                  MY_ASSERT (1, "The case is specified incorrectly");
+
+            if (numCmd == CMD_PUSH)
+            {
+                int numInRegister = register[count_reg];
+                int numInRAM      = ram[numInRegister + num];
+                Push (stk, numInRAM);
+            }
+
+            if (numCmd == CMD_POP)
+            {
+                int lastStackNum   = Pop(stk);
+                int numInRegister  = register[count_reg];
+                ram[numInRegister + num] = lastStackNum;
+            }
         }
     }
 
@@ -244,15 +285,112 @@ void pushSignature (FILE * dst)
 	fwrite (signature, sizeof(int), 3, dst);
 }
 
-void Push (int * stk, int new_memb)
+void Push (stack_t * stk, elem_t new_memb)
 {
-  
+    MY_ASSERT (stk == nullptr, "No stack access");
+    //FILE * logfile = fopen ("log.txt", "a");
+    
+    if (stk->n_memb >= stk->capacity)
+    {
+        resize (stk, increase);
+    }
+    stk->data[stk->n_memb] = new_memb;
+    stk->n_memb++;
+    // ToDo: n_memb++ here ... done
+
+    // hash_sum (stk);
+    // STK_OK (stk);
+    fclose (logfile);
 }
 
-int Pop (int * stk)
+elem_t Pop (stack_t * stk)
 {
-    
+    stk->n_memb--;
+
+    MY_ASSERT (stk->n_memb < 0, "Error : there are no variables in the stack"); //было бы прикольно как-то, не ломая, обработать
+
+    elem_t pop = (stk->data)[stk->n_memb];
+    (stk->data)[stk->n_memb] = POISON;
+
+    if (THRESHOLD_RATIO*(stk->n_memb) <= stk->capacity && (str->capacity/RESIZE) >= (stk -> minCapacity)) 
+    {
+        resize(stk, reduce);
+    }
+
+    return pop;
 }
+
+void Ctor (stack_t * stk, size_t capacity)
+{
+    stk -> n_memb = 0;
+    stk -> capacity = capacity;
+
+    char * data = (char *) calloc ((stk->capacity)*sizeof(elem_t), sizeof(char));
+    stk -> data = (elem_t *)data;    
+} 
+
+void resize (stack_t * stk, int mode)
+{
+    if (mode == increase)
+    {
+        stk->capacity *= RESIZE;
+        cnr_t temp     = *(stk->ptr_canary_data_second);
+        //printf ("in resize before recalloc stk->ptr_canary_data_second = %p\n", stk->ptr_canary_data_second);
+        //printf ("The value of stk->ptr_canary_data_second BEFORE resize = %llX\n", *(stk->ptr_canary_data_second));
+
+        char * ptr = (char *) recalloc (stk->ptr_canary_data_first, (stk->capacity)*sizeof(elem_t) + 2*sizeof(hash_t), sizeof(char));
+
+        stk->ptr_canary_data_first     = (hash_t *) ptr;
+        stk->data                      = (elem_t *)((char *)stk->ptr_canary_data_first + sizeof (hash_t));
+        stk->ptr_canary_data_second    = (cnr_t *)((char *)stk->ptr_canary_data_first + (char)((stk->capacity)*sizeof(elem_t)) + sizeof(hash_t));
+        *(stk->ptr_canary_data_second) = temp;
+
+        MY_ASSERT (stk->ptr_canary_data_first == nullptr, "New pointer after resize is nullptr");
+
+        for (int i = 0; i < (stk->capacity - stk->n_memb); i++)
+        {
+            *((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) = POISON;
+        }
+
+        //stk->ptr_canary_data_first = (cnr_t *) ptr;
+        //printf ("in resize after recalloc stk->ptr_canary_data_second = %p\n", stk->ptr_canary_data_second);
+        //printf ("The value of stk->ptr_canary_data_second AFTER resize = %llX\n", *(stk->ptr_canary_data_second));
+        //check_err (); stk->data != nullptr
+    }
+    else if (mode == reduce)
+    {
+        stk->capacity /= RESIZE;
+        cnr_t temp = *(stk->ptr_canary_data_second);
+
+        //printf ("in resize before recalloc stk->ptr_canary_data_second = %p\n", stk->ptr_canary_data_second);
+        //printf ("The value of stk->ptr_canary_data_second BEFORE resize = %llX\n", *(stk->ptr_canary_data_second));
+
+        char * ptr = (char *) recalloc (stk->ptr_canary_data_first, (stk->capacity)*sizeof(elem_t) + 2*sizeof(hash_t), sizeof(char));
+
+        stk->ptr_canary_data_first     = (hash_t *) ptr;
+        stk->data                      = (elem_t *)((char *)stk->ptr_canary_data_first + sizeof (hash_t));
+        stk->ptr_canary_data_second    = (cnr_t  *)((char *)stk->ptr_canary_data_first + (char)((stk->capacity)*sizeof(elem_t)) + sizeof(hash_t));
+        *(stk->ptr_canary_data_second) = temp;
+
+        MY_ASSERT (stk->ptr_canary_data_first == nullptr, "New pointer after resize is nullptr");
+
+        for (int i = 0; i < (stk->capacity - stk->n_memb); i++)
+        {
+            *((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) = POISON;
+        }
+
+        //stk->ptr_canary_data_first = (cnr_t *) ptr;
+        //printf ("in resize after recalloc stk->ptr_canary_data_second = %p\n", stk->ptr_canary_data_second);
+        //printf ("The value of stk->ptr_canary_data_second AFTER resize = %llX\n", *(stk->ptr_canary_data_second));
+        //check_err (); stk->data != nullptr
+    }
+    else 
+    {
+        printf ("Incorrect operation mode of the function resize\n");
+        abort ();
+    }
+}
+
 
 // FILE * open_asm_text (void)
 // {

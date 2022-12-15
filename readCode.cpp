@@ -81,11 +81,11 @@ static int correctBuf (char * buf, int nElements)
 		{
 			buf[i] = '\0';
             
-			nStrings++;
+			// nStrings++;
 		}
         
 	}
-    printf ("nStrings = %d\n\n", nStrings);
+    printf ("nStrings = %d, buf = %s\n\n", nStrings, buf);
     
 	return nStrings;
 }
@@ -99,9 +99,9 @@ static char ** arrPtrToStrings (int nStrs, size_t size)
 
 static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t code) 
 {
-    // skipSpace (&buf, 0);
-	// arrPtrsToStrings[0] = buf;
-	for (int nSym = 0, j = 0; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++) //added j < code.nStrs
+    skipSpace (&buf, 0);
+	arrPtrsToStrings[0] = buf;
+	for (int nSym = 0, j = 1; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++) //added j < code.nStrs
 	{
 		if (*buf == '\0')
 		{

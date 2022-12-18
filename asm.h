@@ -12,7 +12,6 @@
 #define LONG_LINE "-----------------------------------------------------------------------------------------------------\n"
 
 typedef enum  {
-    CMD_HLT  = 0,
     CMD_PUSH = 1,
     CMD_POP  = 2,
     CMD_ADD  = 3,
@@ -28,7 +27,9 @@ typedef enum  {
     CMD_JB   = 13,
     CMD_JBE  = 14,
     CMD_JGE  = 15,
-    CMD_JE   = 16
+    CMD_JE   = 16,
+    CMD_HLT  = 17,
+    CMD_SQRT = 18
 } COMMANDS;
 
 enum {
@@ -41,7 +42,7 @@ enum {
 typedef int elem_t;
 
 struct tag {
-    int ptr;
+    int * ptr;
     char * nameTag;
 };
 typedef struct tag tag_t;
@@ -49,13 +50,12 @@ typedef struct tag tag_t;
 struct freeCall {
     int * ptrToArrWithCode;
     char * tag;
+    int numFreeCall;
 };
 typedef struct freeCall freeCall_t;
 
-void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile);
+void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags);
 void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, tag_t * tags);
-void otherForm (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags);
-void ram (int ** code, char * firstBracket, int numCmd);
 void pushSignature (FILE * dst, code_t code);
 
 //-------------------------------------------string functions---------------------------------------------

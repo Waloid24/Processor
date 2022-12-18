@@ -3,8 +3,7 @@
 const int SIGNATURE = 3;
 const int VERSION = 1;
 
-const int NUM_TAGS = 20;
-const int N_FUNC_WITHOUT_ARG = 40;
+int N_FUNC_WITHOUT_ARG = 0;
 
 const int NO_TAGS = -2;
 
@@ -15,9 +14,11 @@ enum {
 
 static void scanTag (char * src, char * dst, int lengthSrc);
 static int findFreePlace (tag_t * tags, int sizeArrTags);
-static int findTag (tag_t * tags, char * argument);
+static long int findTag (tag_t * tags, char * argument, int * startArrWithCode, int numTags);
+static void ram (int ** code, char * firstBracket, int numCmd);
+static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags);
 
-void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
+void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags)
 {
     MY_ASSERT (arrStrs == nullptr, "There is no access to array of strings");
     MY_ASSERT (prog == nullptr, "There is no access to struct with information about code file");
@@ -32,18 +33,19 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
     setbuf (binFile, NULL);
     // pushSignature (binFile, *prog);
 
-    tag_t * tags = (tag_t *) calloc (NUM_TAGS, sizeof(tag_t));
+    tag_t * tags = (tag_t *) calloc (numTags, sizeof(tag_t));
     MY_ASSERT (tags == nullptr, "Unable to allocate new memory");
 
     int * code = (int *) calloc (prog->nStrs * 3, sizeof(int)); //выделяем для int, а указаетль как char
     int * tmp = code;
 
     int isTag = 0;
-    int tagCallOrJmps = 0;
+    long int tagCallOrJmps = 0;
     int tagJmp = 0;
 
-    freeCall_t * tagCallsOrJmps = (freeCall_t *) calloc (N_FUNC_WITHOUT_ARG, sizeof(int));
-    MY_ASSERT (tagCallsOrJmps == nullptr, "Unable to allocate new memory");
+    freeCall_t * freeFunc = (freeCall_t *) calloc (numTags, sizeof(freeCall_t));
+    MY_ASSERT (freeFunc == nullptr, "Unable to allocate new memory");
+    freeCall_t * saveTagCallsOrJumps = freeFunc;
 
     #define DEF_CMD(nameCmd, countLetters, numCmd, isArg)                       \
         if (myStrcmp (cmd, #nameCmd) == 0)                                      \
@@ -65,7 +67,7 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
         else 
 
     #define CALLS_AND_JMPS(nameJmp, length)                                     \
-        if (myStrcmp (cmd, #nameJmp) == 0)                                       \
+        if (myStrcmp (cmd, #nameJmp) == 0)                                      \
         {                                                                       \
             countArgs++;                                                        \
             *code = CMD_##nameJmp;                                              \
@@ -78,15 +80,18 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
             char * nameTag = (char *) calloc (lengthTag, sizeof(char));         \
             scanTag (arrStrs[i], nameTag, lengthTag);                           \
                                                                                 \
-            tagCallOrJmps = findTag (tags, nameTag);                            \
-            printf (">>> in otherForm: indexTag = %d\n", tagCallOrJmps);        \
+            tagCallOrJmps = findTag (tags, nameTag, tmp, numTags);              \
+            printf (">>> in no_ram: indexTag = %ld\n", tagCallOrJmps);          \
             if (tagCallOrJmps == NO_TAGS)                                       \
             {                                                                   \
-                tagCallsOrJmps->ptrToArrWithCode = code;                        \
-                tagCallsOrJmps->tag = nameTag;                                  \
+                freeFunc->ptrToArrWithCode = code;                              \
+                freeFunc->tag = nameTag;                                        \
+                N_FUNC_WITHOUT_ARG++;                                           \
+                printf ("free FUNC: *(freeFunc->ptrToArrWithCode) = %d,"        \
+                " N_FUNC_WITHOUT_ARG = %d, freeFunc->tag = %s\n",               \
+                *(code-1), N_FUNC_WITHOUT_ARG, freeFunc->tag);                  \
                 code++;                                                         \
-                printf ("free CALL: *(tagCallsOrJmps->ptrToArrWithCode) = %d,"  \
-                " tagCallsOrJmps->ptrToCallInArrStr = %d\n", *code, i);         \
+                freeFunc++;                                                     \
             }                                                                   \
             else                                                                \
             {                                                                   \
@@ -110,18 +115,19 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
 
         if (strchr (cmd, ':') != nullptr) 
         {
-            int freeTag = findFreePlace (tags, NUM_TAGS);
+            int freeTag = findFreePlace (tags, numTags);
             MY_ASSERT (freeTag == -1, "There are no free cells in the tag array");
 
             int lengthSrc = strlen (cmd);
-            printf ("in createBinFile in for (\033[31m call \033[0m): %d\n", lengthSrc);
+            printf ("in createBinFile in for (\033[31m length tag \033[0m): %d\n", lengthSrc);
 
             tags[freeTag].nameTag = (char *) calloc (lengthSrc, sizeof(char));
             MY_ASSERT (tags[freeTag].nameTag == nullptr, "Unable to allocate new memory");
             scanTag (cmd, tags[freeTag].nameTag, lengthSrc);
 
+            tags[freeTag].ptr = code;   
+            printf ("tags[%d].ptr = %d; *code = %d\n", freeTag, *(tags[freeTag].ptr), *(code-1));       
             printf ("tags[%d].nameTag = %s\n", freeTag, tags[freeTag].nameTag);
-            printf ("tags[%d].ptr = %d\n", freeTag, tags[freeTag].ptr);
         }
         else
         #include "jmps.h"
@@ -132,16 +138,16 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile)
         }
         printf ("\n");
     }
-    
-        while (tagCallsOrJmps->ptrToArrWithCode != nullptr)
-        {
-            tagCallOrJmps = findTag (tags, tagCallsOrJmps->tag);
-            printf (">>> in otherForm: indexTag = %d\n", tagCallOrJmps);
-            MY_ASSERT (tagCallOrJmps == NO_TAGS, "This tag does not exist");
-            *(tagCallsOrJmps->ptrToArrWithCode) = tagCallOrJmps;
-            tagCallsOrJmps++;
-        }
-    
+    printf ("N_FUNC_WITHOUT_ARG = %d\n", N_FUNC_WITHOUT_ARG);
+    for (int i = 0; i < N_FUNC_WITHOUT_ARG; i++)
+    {
+        printf ("*(saveTagCallsOrJumps->ptrToArrWithCode) = %d\n", *(saveTagCallsOrJumps->ptrToArrWithCode));
+        tagCallOrJmps = findTag (tags, saveTagCallsOrJumps->tag, tmp, numTags);
+        printf (">>> in no_ram: indexTag = %ld\n", tagCallOrJmps);
+        MY_ASSERT (tagCallOrJmps == NO_TAGS, "This tag does not exist");
+        *(saveTagCallsOrJumps->ptrToArrWithCode) = tagCallOrJmps;
+        saveTagCallsOrJumps++;
+    }   
 
     for (int i = 0; i < prog->nStrs * 3; i++)
     {
@@ -186,7 +192,7 @@ static void scanTag (char * src, char * dst, int lengthSrc)
         }
         else
         {
-            MY_ASSERT (1, "Incorrect tag: missing ":" or there are invalid characters");
+            MY_ASSERT (1, "Incorrect tag: missing \":\" or there are invalid characters");
         }
     }
 }
@@ -196,153 +202,146 @@ void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, ta
 	char * firstBracket = nullptr;
     if ((firstBracket = strchr (str_text_code, '[')) != nullptr)
     {
+        printf ("[]\n");
         ram(code, firstBracket, numCmd);
     }
     else
 	{
-		printf ("There isn't bracket\n");
-        otherForm(code, str_text_code, countLetters, numCmd, tags); //есть ли неинициал тэг
+		printf ("no []\n");
+        no_ram(code, str_text_code, countLetters, numCmd, tags); //есть ли неинициал тэг
 	}
 }
 
-void otherForm (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags)
+static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags) //только push
 {
-    printf ("in otherForm: \033[32;1m numCmd \033[0m = %d\n", numCmd);
+    printf ("in no_ram: \033[32;1m numCmd \033[0m = %d\n", numCmd);
 
-	char * reg  = (char *) calloc (3, sizeof(char));
-    MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
-
-    char * trash = (char *) calloc (3, sizeof(char));
-    MY_ASSERT (trash == nullptr, "func GetArgument: it's impossible to read other symbols");
-
-	int num = -1;
     skipSpace (&strCode, countLetters);
     char * ptrToArg = strCode;
 
-	printf ("in otherForm: \033[32;1m argument \033[0m = %c\n", *ptrToArg);
+    //ищем минус
+    //если он есть, то сразу после него только число, причем это push
+    //если минуса нет, то возможны случаи pop и push
+    //если есть rax, если нет rax
+    //нет rax, то push 5
 
-    if ((strcmp (ptrToArg, "rax") >= 0) || (strcmp (ptrToArg, "rbx") >= 0) ||
-        (strcmp (ptrToArg, "rcx") >= 0) || (strcmp (ptrToArg, "rdx") >= 0))
-    {
-		printf ("yes \033[35;1m REG \033[0m\n");
-        // sscanf (ptrToArg, "%[rabcdx]%[ +]%d", reg, trash, &num); //обработка push rax + 5
-        sscanf (ptrToArg, "%[rabcdx]", reg);
-        ptrToArg = ptrToArg + 3;
-        skipSpace (&ptrToArg, 0);
-        printf ("*ptrToArg = %c\n", *ptrToArg);
-        sscanf (ptrToArg, "%[+]", trash);
-        ptrToArg = ptrToArg + 1;
-        skipSpace (&ptrToArg, 0);
-        sscanf (ptrToArg, "%d", &num);
-    }
-    else
-    {
-		printf ("There isn't register\n");
-        int nDigits = readNum (ptrToArg, &num); 
-        skipSpace (&ptrToArg, nDigits);
-        sscanf (ptrToArg, "%[+]", trash);
-        skipSpace (&ptrToArg, 1);
-        sscanf (ptrToArg, "%[rabcdx]", reg);
-        
-        
-    }
-	printf ("Your reg = %s, trash = %s, num = %d\n", reg, trash, num);
-    
-    MY_ASSERT (numCmd != 9 && num == -1 && *reg == 0, "Your argument in square brackets are incorrect");
+    char * reg  = (char *) calloc (4, sizeof(char));
+    MY_ASSERT (reg == nullptr, "It's impossible to read the argument");
 
-    if (num == -1 && *reg != 0)        //ситуация вида push rax и pop rax или jmp
+    char * ptrToReg = nullptr;
+
+    char * placeOfPlus = nullptr;
+
+    if (strchr(ptrToArg, '-') != nullptr) //ситуация push -5
     {
-		printf ("reg != 0 RRRRRRRRRRRRR\n");
+        MY_ASSERT (numCmd != CMD_PUSH, "the minus can only be present in the \"push\" command"); 
+		printf ("command is push 111\n");
+        **code = 33;
+        (*code)++;
+        **code = atoi(strCode);
+        printf ("in no_ram: push -...: **code = %d\n", **code);
+    }
+    else if ((ptrToReg = strchr(ptrToArg, 'r')) != nullptr) //если есть 
+    {
+        printf ("there is reg\n");
+        reg = (char *) memcpy (reg, ptrToReg, 3 * sizeof(char));
+        *(reg+3) = '\0';
+        printf ("reg = %s\n", reg);
+
         char count_reg = 0;
         if      (strcmp (reg, "rax") == 0) count_reg = (char) RAX;
         else if (strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
         else if (strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
         else if (strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
         else    MY_ASSERT (1, "The case is specified incorrectly");
-
-
-        if (numCmd == CMD_PUSH) //0100 | 0001 push rax
-        {                       
-            **code = 65;
-            (*code)++;
-            **code = count_reg;
-        }
-
-        else if (numCmd == CMD_POP) //0100 | 0010   pop rax
+            
+        if ((placeOfPlus = strchr(ptrToArg, '+')) != nullptr) //pop rax + 5, push rax + 5
         {
-            **code = 66;
-            (*code)++;
-            **code = count_reg;
+            placeOfPlus++;
+            if (numCmd == CMD_PUSH) //push rax + 5, push 5 + rax
+            {
+                **code = 97;
+                (*code)++;
+            }
+            else if (numCmd == CMD_POP)
+            {
+                **code = 98;
+                (*code)++;
+            }   
+            else
+            {
+                MY_ASSERT (1, "Incorrect expression with \"+\"");
+            }
+
+            skipSpace(&placeOfPlus, 0);
+            printf ("placeOfPlus = %s\n", placeOfPlus);
+            int num = 0;
+            int nSymbols = readNum (ptrToArg, &num);
+            if (nSymbols == 0)                              //push rax + 5
+            {
+                readNum (placeOfPlus, &num);
+                **code = count_reg;
+                printf ("**code (reg) = %d\n", **code);
+                (*code)++;
+                **code = num;
+                printf ("**code (num) = %d\n", **code);
+            }
+            else                                            //push 5 + rax
+            {
+                **code = count_reg;
+                printf ("**code (reg) = %d\n", **code);
+                (*code)++;
+                **code = num;
+                printf ("**code (num) = %d\n", **code);
+            }
+        }
+        else                                                //push rax, pop rax
+        {
+            if (numCmd == CMD_PUSH)
+            {
+                printf ("push rax");
+                **code = 65;
+                (*code)++;
+                **code = count_reg;
+            }
+            else if (numCmd == CMD_POP)
+            {
+                **code = 66;
+                (*code)++;
+                **code = count_reg;
+            }
+            else
+            {
+                MY_ASSERT (1, "Incorrect expression with a case without \"+\"");
+            }
         }
     }
-
-    else if (*reg == 0 && num != -1) //ситуация вида push 5 и pop 5
+    else if (numCmd == CMD_PUSH) //push 5
     {
-		printf ("this if\n");
-        if (numCmd == CMD_PUSH) //0010 | 0001
-        {  
-			printf ("command is push 111\n");
-            **code = 33;
-            (*code)++;
-            **code = num;
-        }
-            
-        else if (numCmd == CMD_POP)  //if менять на else //0010 | 0010
-        {
-			printf ("command is pop 222\n");
-            **code = 34;
-            (*code)++;
-            **code = num;
-        }
-        else //это jmp     //0010 | 1000
-		{
-			printf ("command is jmp 333\n");
-			**code = 40;
-            (*code)++;
-            **code = num;
-		}
-            
+        int num = 0;
+        int nSymbols = readNum (ptrToArg, &num);
+        MY_ASSERT (nSymbols == 0, "Push without a numeric argument\n");
+        **code = 33;
+        (*code)++;
+        **code = num;
     }
-    else //ситуация вида push 5 + rax, или pop 5 + rax, или rax + 5
+    else if (numCmd == CMD_POP)
     {
-        char count_reg = 0;
-        if      (strcmp (reg, "rax") == 0) count_reg = (char) RAX;
-        else if (strcmp (reg, "rbx") == 0) count_reg = (char) RBX;
-        else if (strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
-        else if (strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
-        else                                  MY_ASSERT (1, "The case is specified incorrectly");
-
-        if (numCmd == CMD_PUSH) //0110 | 0001    push 5 + rax
-        {
-            **code = 97;
-            (*code)++;
-            **code = count_reg;
-            (*code)++;
-            **code = num;
-        }
-
-        else if (numCmd == CMD_POP) //0110 | 0010    pop 5 + rax
-        {
-            **code = 98;
-            (*code)++;
-            **code = count_reg;
-            (*code)++;
-            **code = num;
-        }
-        else //0110 | 1000                 rax + 5
-        {
-            **code = 104;
-            (*code)++;
-            **code = count_reg;
-            (*code)++;
-            **code = num;
-        }
+        int num = 0;
+        int nSymbols = readNum (ptrToArg, &num);
+        MY_ASSERT (nSymbols != 0, "Pop with a numeric argument\n");
+        **code = 34;
+        (*code)++;
+        **code = num;
+    }
+    else
+    {
+        MY_ASSERT (1, "Incorrect push or pop");
     }
     free (reg);
-    free (trash);
 }
 
-void ram (int ** code, char * firstBracket, int numCmd)
+static void ram (int ** code, char * firstBracket, int numCmd)
 { 
 	printf ("Works ram func\n");
 	printf ("numCmd = %d\n", numCmd);
@@ -481,18 +480,19 @@ void skipSpace (char ** strCode, int countLetters)
     }
 }
 
-static int findTag (tag_t * tags, char * argument)
+static long int findTag (tag_t * tags, char * argument, int * startTagWithCode, int numTags)
 {
     MY_ASSERT (tags == nullptr, "There is no access to array with tags");
-    for (int i = 0; i < NUM_TAGS; i++)
+    for (int i = 0; i < numTags; i++)
     {
-        printf (">>>in findTag: argument [%d/%d] = %s\n", i, NUM_TAGS, argument);
-        if (tags[i].nameTag != nullptr && myStrcmp (argument, tags[i].nameTag) >= 0) //==?
+        printf (">>>in findTag: argument [%d/%d] = %s, tags[%d].nameTag = %s\n", i, numTags, argument, i, tags[i].nameTag);
+        if (tags[i].nameTag != nullptr && myStrcmp (argument, tags[i].nameTag) == 0) //==?
         {
             printf (">>>hyi Landau\n");
-            return tags[i].ptr;
+            return tags[i].ptr - startTagWithCode;
         }
     }
+    printf ("NO_TAGS!\n");
     return NO_TAGS;
 }
 

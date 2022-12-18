@@ -452,7 +452,7 @@ FILE * open_logfile (const char * name_logfile)
 
 void stk_ok (stack_t * stk, FILE * log)
 {
-    printf ("STK_OK\n");
+    // printf ("STK_OK\n");
     int sum_err = 0;
     if ((sum_err = struct_validator(stk, log)) != NOERR_STK)
     {

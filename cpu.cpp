@@ -7,7 +7,7 @@
     if (n1 sign n2)                                 \
     {                                               \
         int ptrToJmp = arrCode[i];                  \
-        printf ("in cpu ja! tmp = %d\n", ptrToJmp); \
+        printf ("in cpu JMP_FORM! tmp = %d, %d %s %d\n", ptrToJmp, n1, #sign, n2); \
         i = ptrToJmp-1;                             \
         stack_push (&stk, n2, logfile);             \
         stack_push (&stk, n1, logfile);             \
@@ -23,13 +23,18 @@ const int MAX_RAM = 100;
 
 static int getNum (void);
 
-void getCode (char * nameFile, code_t fileInfo)
+void getCode (char * nameFile, code_t fileInfo, int numTags)
 {
     MY_ASSERT (nameFile == nullptr, "Unable to access the file");
     FILE * logfile = open_logfile ("stack_log.txt");
-    MY_ASSERT (logfile == nullptr, "Unable to open logfile");
+    MY_ASSERT (logfile == nullptr, "Unable to open logfile for stack");
+    FILE * logCallStack = open_logfile ("callStack.txt");
+    MY_ASSERT (logCallStack == nullptr, "Unable to open logfile for call stack");
     setbuf (logfile, NULL);
     stack_t stk = {};
+
+    stack_t callStack = {};
+    stk_ctor (&callStack, numTags, "callStk");
 
     FILE * binFile = fopen (nameFile, "rb");
     MY_ASSERT (binFile == nullptr, "Unable to open binary file");
@@ -49,7 +54,7 @@ void getCode (char * nameFile, code_t fileInfo)
     for (int i = 0; i < fileInfo.nStrs * 3; i++)
     {
         printf (">>arrCode[%d] = %d\n", i, arrCode[i]);
-        if (arrCode[i] == 0) //hlt
+        if (arrCode[i] == 17) //hlt
         {
             // stack_dtor (&stk);
             break;
@@ -63,6 +68,7 @@ void getCode (char * nameFile, code_t fileInfo)
         }
         else if (arrCode[i] == 34) //pop 
         {
+            i++;
             stack_pop (&stk, logfile);
         }
         else if (arrCode[i] == 65) //push rax
@@ -118,7 +124,7 @@ void getCode (char * nameFile, code_t fileInfo)
             MY_ASSERT (nReg > NUM_REGISTERS-1, "You are out of register memory");
             int ramIndex = regs[nReg];
             MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
-            ram[ramIndex] = stack_pop (&stk, logfile);;
+            ram[ramIndex] = stack_pop (&stk, logfile);
         }
         else if (arrCode[i] == 225)  //push [5 + rcx]
         {
@@ -171,7 +177,7 @@ void getCode (char * nameFile, code_t fileInfo)
         }
         else if (arrCode[i] == 7) //out
         {
-            fprintf (stdout, "%d", stack_pop (&stk, logfile));
+            fprintf (stdout, "OUT: %d\n", stack_pop (&stk, logfile));
         }
         else if (arrCode[i] == 8) // in
         {
@@ -184,7 +190,7 @@ void getCode (char * nameFile, code_t fileInfo)
         {
             i++;
             int ptrToJmp = arrCode[i];
-            printf ("in cpu jmp! tmp = %d\n", ptrToJmp);
+            printf ("in cpu jmp! ptrToJmp = %d\n", ptrToJmp);
             i = ptrToJmp-1;
         }
         else if (arrCode[i] == 12) //ja  
@@ -207,17 +213,33 @@ void getCode (char * nameFile, code_t fileInfo)
         {
             JUMP_FORM (==)
         }
+        else if (arrCode[i] == 10) //call
+        {
+            i++;
+            int ptrToJmp = arrCode[i];
+            stack_push (&callStack, i+1, logCallStack);
+            i = ptrToJmp-1;
+            printf ("in call: call = %d, i = %d\n", ptrToJmp, i);
+        }
         else if (arrCode[i] == 11) //RET
         {
-            
+            i = stack_pop (&callStack, logCallStack) - 1;
+            printf ("in ret: i = %d\n", i);
+        }
+        else if (arrCode[i] == 18)
+        {
+            int tmp = stack_pop (&stk, logfile);
+            printf ("tmp = %d\n", tmp);
+            int result = (int) sqrt ((double) tmp);
+            printf ("sqrt = %d\n", result);
+            stack_push (&stk, result, logfile);
         }
         else 
         {
+            break;
             printf ("You have some problem\n");
         }
     }
-
-    printf ("in stack = %d\n", stack_pop (&stk, logfile));
 
     free (regs);
     free (arrCode);

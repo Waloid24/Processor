@@ -14,25 +14,19 @@ static void removeSpaces (char * dest, const char * source);
 code_t readCode (const char * nameFile)
 {
     MY_ASSERT (nameFile == nullptr, "You did not pass the file name");
-    
     code_t fileInfo = {};
     fileInfo.sizeFile = size (nameFile);
 
     FILE * codeFile = fopen (nameFile, "r");
     MY_ASSERT (codeFile == nullptr, "Unable to open code file");
     setbuf(codeFile, NULL);
-
     writeTextToBuf (&fileInfo, codeFile);
-
     fileInfo.nStrs = correctBuf (fileInfo.buf, fileInfo.sizeFile);
-
     fileInfo.arrStrs = arrPtrToStrings (fileInfo.nStrs, sizeof(char *));
-
     fillArr (fileInfo.arrStrs, fileInfo.buf, fileInfo.sizeFile, fileInfo);
-
     for (int i = 0; i < fileInfo.nStrs; i++)
     {
-        printf ("%s\n", fileInfo.arrStrs[i]);
+        printf ("---final readCode: %s\n", fileInfo.arrStrs[i]);
     }
 
     fclose (codeFile);
@@ -80,13 +74,15 @@ static int correctBuf (char * buf, int nElements)
 		if (buf[i] == '\n')
 		{
 			buf[i] = '\0';
-            
-			// nStrings++;
 		}
         
 	}
     printf ("nStrings = %d, buf = %s\n\n", nStrings, buf);
-    
+    for (int i = 0; i < nElements; i++)
+    {
+        printf ("%c", buf[i]);
+    }
+    printf ("\n");
 	return nStrings;
 }
 
@@ -111,6 +107,7 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
             }
             skipSpace (&buf, 0);
 			arrPtrsToStrings[j] = buf;
+            printf ("arrPtrsToStrings[%d] = %s\n", j, arrPtrsToStrings[j]);
 			j++;
 		}
 		buf++;

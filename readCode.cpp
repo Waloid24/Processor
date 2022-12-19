@@ -105,9 +105,14 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
             {
                 buf++;
             }
+            // for (int i = 0; i < 8; i++)
+            // {
+            //     printf ("buf[%d] = %d\n", i, buf[i]);
+            // }
             skipSpace (&buf, 0);
+            // printf ("after skipSpace: %s\n", buf);
 			arrPtrsToStrings[j] = buf;
-            printf ("arrPtrsToStrings[%d] = %s\n", j, arrPtrsToStrings[j]);
+            // printf ("arrPtrsToStrings[%d] = %s\n", j, arrPtrsToStrings[j]);
 			j++;
 		}
 		buf++;
@@ -117,7 +122,7 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
 static void skipSpace (char ** strCode, int countLetters)
 {
     *strCode = *strCode + countLetters;
-    for (; **strCode == ' ' || **strCode == '\t'; ) //*strCode != nullptr && 
+    for (; **strCode == ' ' || **strCode == '\t' || **strCode == '\0'; ) //*strCode != nullptr && 
     {
         (*strCode)++;
     }

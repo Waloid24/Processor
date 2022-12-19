@@ -8,7 +8,7 @@ without_a:; эта часть работает
     div;
     out;
 hlt;
-
+              
 discriminant:;
     push 4;
     push rax;

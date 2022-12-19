@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "readCode.h"
+#include "my_string.h"
 #include "MY_ASSERT.h"
 
 #define STANDART_SIZE 20
@@ -55,14 +56,5 @@ struct freeCall {
 typedef struct freeCall freeCall_t;
 
 void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags);
-void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, tag_t * tags);
-void pushSignature (FILE * dst, code_t code);
-
-//-------------------------------------------string functions---------------------------------------------
-int myStrcmp (const char * string1, const char * string2);
-int readNum (char * src, int * dst);
-void skipSpace (char ** str_text_code, int countLetters);
-//--------------------------------------------------------------------------------------------------------
-
 
 #endif

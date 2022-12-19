@@ -6,7 +6,7 @@
 
 const int NUM_TAGS = 20;
 
-int main (int argc, char * argv[]) //secons argument is code file
+int main (int argc, char * argv[])
 {
     MY_ASSERT (argc != 3, "Too few command line arguments!");
     code_t codeInfo = {};

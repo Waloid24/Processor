@@ -7,7 +7,6 @@
     if (n1 sign n2)                                 \
     {                                               \
         int ptrToJmp = arrCode[i];                  \
-        printf ("in cpu JMP_FORM! tmp = %d, %d %s %d\n", ptrToJmp, n1, #sign, n2); \
         i = ptrToJmp-1;                             \
         stack_push (&stk, n2, logfile);             \
         stack_push (&stk, n1, logfile);             \
@@ -53,10 +52,9 @@ void getCode (char * nameFile, code_t fileInfo, int numTags)
 
     for (int i = 0; i < fileInfo.nStrs * 3; i++)
     {
-        printf (">>arrCode[%d] = %d\n", i, arrCode[i]);
         if (arrCode[i] == 17) //hlt
         {
-            // stack_dtor (&stk);
+            stack_dtor (&stk);
             break;
         }
         else if (arrCode[i] == 33) //push 7
@@ -182,7 +180,6 @@ void getCode (char * nameFile, code_t fileInfo, int numTags)
         else if (arrCode[i] == 8) // in
         {
             int tmp = getNum ();
-            printf ("tmp = %d\n", tmp);
             stack_push (&stk, tmp, logfile);
             stack_dump (stk, logfile);
         }
@@ -190,7 +187,6 @@ void getCode (char * nameFile, code_t fileInfo, int numTags)
         {
             i++;
             int ptrToJmp = arrCode[i];
-            printf ("in cpu jmp! ptrToJmp = %d\n", ptrToJmp);
             i = ptrToJmp-1;
         }
         else if (arrCode[i] == 12) //ja  
@@ -219,25 +215,21 @@ void getCode (char * nameFile, code_t fileInfo, int numTags)
             int ptrToJmp = arrCode[i];
             stack_push (&callStack, i+1, logCallStack);
             i = ptrToJmp-1;
-            printf ("in call: call = %d, i = %d\n", ptrToJmp, i);
         }
         else if (arrCode[i] == 11) //RET
         {
             i = stack_pop (&callStack, logCallStack) - 1;
-            printf ("in ret: i = %d\n", i);
         }
         else if (arrCode[i] == 18)
         {
             int tmp = stack_pop (&stk, logfile);
-            printf ("tmp = %d\n", tmp);
             int result = (int) sqrt ((double) tmp);
-            printf ("sqrt = %d\n", result);
             stack_push (&stk, result, logfile);
         }
         else 
         {
+            stack_dtor (&stk);
             break;
-            printf ("You have some problem\n");
         }
     }
 

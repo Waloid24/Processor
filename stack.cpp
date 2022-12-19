@@ -24,13 +24,10 @@ void stack_ctor (stack_t * stk, size_t capacity, const char * name_stk,
     stk -> ptr_canary_data = (canary_t *) ((char *)data + sizeof(canary_t) + (stk->capacity)*sizeof(elem_t));
     *(stk -> ptr_canary_data) = BUF_CNR_SCND;
 
-    //printf ("In Ctor: ");
     for (size_t i = 0; i < stk->capacity; i++)
     {
         *((elem_t*)((char *)stk->data + i * sizeof(elem_t))) = POISON_ELEM_STK;
-        //printf ("%X, ", *((elem_t*)((char *)stk->data + i * sizeof(elem_t))));
     }
-    //printf ("\n");
 
     *(stk -> ptr_canary_hashsum) = calculate_hash (stk->data, sizeof(sizeof(hash_t) + (stk->capacity)*sizeof(elem_t)));
     stk -> hashsum_stack = calculate_hash ((char*)stk + (char) sizeof (canary_t), sizeof(stack_t)-sizeof(canary_t));

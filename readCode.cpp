@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <sys/stat.h>
-#include "MY_ASSERT.h"
 #include "readCode.h"
 
 static size_t size (const char * arg_console);
@@ -8,8 +5,8 @@ static void writeTextToBuf (code_t * code, FILE * codeFile);
 static int correctBuf (char * buf, int nElements);
 static char ** arrPtrToStrings (int nStrs, size_t size);
 static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t code);
-static void skipSpace (char ** strCode, int countLetters);
 static void removeSpaces (char * dest, const char * source);
+static void skipSpace (char ** strCode, int countLetters);
 
 code_t readCode (const char * nameFile)
 {
@@ -24,10 +21,6 @@ code_t readCode (const char * nameFile)
     fileInfo.nStrs = correctBuf (fileInfo.buf, fileInfo.sizeFile);
     fileInfo.arrStrs = arrPtrToStrings (fileInfo.nStrs, sizeof(char *));
     fillArr (fileInfo.arrStrs, fileInfo.buf, fileInfo.sizeFile, fileInfo);
-    for (int i = 0; i < fileInfo.nStrs; i++)
-    {
-        printf ("---final readCode: %s\n", fileInfo.arrStrs[i]);
-    }
 
     fclose (codeFile);
 
@@ -74,15 +67,8 @@ static int correctBuf (char * buf, int nElements)
 		if (buf[i] == '\n')
 		{
 			buf[i] = '\0';
-		}
-        
+		}   
 	}
-    printf ("nStrings = %d, buf = %s\n\n", nStrings, buf);
-    for (int i = 0; i < nElements; i++)
-    {
-        printf ("%c", buf[i]);
-    }
-    printf ("\n");
 	return nStrings;
 }
 
@@ -97,7 +83,7 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
 {
     skipSpace (&buf, 0);
 	arrPtrsToStrings[0] = buf;
-	for (int nSym = 0, j = 1; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++) //added j < code.nStrs
+	for (int nSym = 0, j = 1; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++)
 	{
 		if (*buf == '\0')
 		{
@@ -105,14 +91,8 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
             {
                 buf++;
             }
-            // for (int i = 0; i < 8; i++)
-            // {
-            //     printf ("buf[%d] = %d\n", i, buf[i]);
-            // }
             skipSpace (&buf, 0);
-            // printf ("after skipSpace: %s\n", buf);
 			arrPtrsToStrings[j] = buf;
-            // printf ("arrPtrsToStrings[%d] = %s\n", j, arrPtrsToStrings[j]);
 			j++;
 		}
 		buf++;
@@ -122,7 +102,8 @@ static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t cod
 static void skipSpace (char ** strCode, int countLetters)
 {
     *strCode = *strCode + countLetters;
-    for (; **strCode == ' ' || **strCode == '\t' || **strCode == '\0'; ) //*strCode != nullptr && 
+	int i = 0;
+    for (; **strCode == ' ' || **strCode == '\t' || **strCode == '\0'; i++)
     {
         (*strCode)++;
     }

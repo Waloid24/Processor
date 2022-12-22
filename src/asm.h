@@ -30,7 +30,8 @@ typedef enum  {
     CMD_JGE  = 15,
     CMD_JE   = 16,
     CMD_HLT  = 17,
-    CMD_SQRT = 18
+    CMD_SQRT = 18,
+    CMD_MEOW = 19
 } COMMANDS;
 
 enum {
@@ -56,5 +57,6 @@ struct freeCall {
 typedef struct freeCall freeCall_t;
 
 void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags);
+void pushSignature (char * nameBinFile, code_t code);
 
 #endif

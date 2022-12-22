@@ -1,7 +1,15 @@
 #include "asm.h"
 
-const int SIGNATURE = 3;
-const int VERSION = 1;
+//TODO: дописать генерацию команд
+//очистить память
+//вернуть листинг
+//добавить все флаги, обработать warnings
+
+int RAM = 1 << 7; //0000 | 0001  -> 1000 | 0000
+int REG = 1 << 6; //0000 | 0001  -> 0100 | 0000
+int NUM = 1 << 5; //0000 | 0001  -> 0010 | 0000
+
+const int SIGNATURE_SIZE = 4;
 
 int N_FUNC_WITHOUT_ARG = 0;
 
@@ -17,15 +25,30 @@ static int findFreePlace (tag_t * tags, int sizeArrTags);
 static long int findTag (tag_t * tags, char * argument, int * startArrWithCode, int numTags);
 static void ram (int ** code, char * firstBracket, int numCmd);
 static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags);
-static void pushSignature (FILE * dst, code_t code);
 static void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, tag_t * tags);
+
+void dumpCode (char ** arrStrs, int * code, int numElem, int nStrs)
+{
+    MY_ASSERT (code == nullptr, "There is no access to this code");
+    MY_ASSERT (arrStrs == nullptr, "There is no access to array with strings");
+
+    FILE * logfile = fopen ("logCode.txt", "a");
+    fprintf (logfile, "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+
+    for (int i = 0; i < numElem; i++)
+    {
+        fprintf (logfile, "code[%d] = %d\n", i, code[i]);
+    }
+
+    fprintf (logfile, "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+}
 
 void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags)
 {
     MY_ASSERT (arrStrs == nullptr, "There is no access to array of strings");
     MY_ASSERT (prog == nullptr, "There is no access to struct with information about code file");
 
-    FILE * binFile = fopen (nameBinFile, "wb");
+    FILE * binFile = fopen (nameBinFile, "a+b");
     MY_ASSERT (binFile == nullptr, "There is no access to bin file");
     setbuf (binFile, NULL);
 
@@ -129,6 +152,8 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
         saveTagCallsOrJumps++;
     }
 
+    dumpCode (arrStrs, tmp, prog->nStrs * 3, prog->nStrs);
+
     fwrite (tmp, sizeof(int), prog->nStrs * 3, binFile);
 
     fclose (binFile);
@@ -198,7 +223,8 @@ static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, t
     if (strchr(ptrToArg, '-') != nullptr)
     {
         MY_ASSERT (numCmd != CMD_PUSH, "the minus can only be present in the \"push\" command"); 
-        **code = 33;
+        **code = **code | NUM;
+        **code = **code | CMD_PUSH;
         (*code)++;
         **code = atoi(strCode);
     }
@@ -213,18 +239,22 @@ static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, t
         else if (strcmp (reg, "rcx") == 0) count_reg = (char) RCX;
         else if (strcmp (reg, "rdx") == 0) count_reg = (char) RDX;
         else    MY_ASSERT (1, "The case is specified incorrectly");
-            
+
         if ((placeOfPlus = strchr(ptrToArg, '+')) != nullptr)
         {
             placeOfPlus++;
-            if (numCmd == CMD_PUSH)
+            if (numCmd == CMD_PUSH) //0110 | 0001
             {
-                **code = 97;
+                **code = **code | REG;
+                **code = **code | NUM;
+                **code = **code | CMD_PUSH;
                 (*code)++;
             }
-            else if (numCmd == CMD_POP)
+            else if (numCmd == CMD_POP) //0110 | 0010
             {
-                **code = 98;
+                **code = **code | REG;
+                **code = **code | NUM;
+                **code = **code | CMD_POP;
                 (*code)++;
             }   
             else
@@ -253,13 +283,15 @@ static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, t
         {
             if (numCmd == CMD_PUSH)
             {
-                **code = 65;
+                **code = **code | REG;
+                **code = **code | CMD_PUSH;
                 (*code)++;
                 **code = count_reg;
             }
             else if (numCmd == CMD_POP)
             {
-                **code = 66;
+                **code = **code | REG;
+                **code = **code | CMD_POP;
                 (*code)++;
                 **code = count_reg;
             }
@@ -274,7 +306,8 @@ static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, t
         int num = 0;
         int nSymbols = readNum (ptrToArg, &num);
         MY_ASSERT (nSymbols == 0, "Push without a numeric argument\n");
-        **code = 33;
+        **code = **code | NUM;
+        **code = **code | CMD_PUSH;
         (*code)++;
         **code = num;
     }
@@ -283,7 +316,8 @@ static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, t
         int num = 0;
         int nSymbols = readNum (ptrToArg, &num);
         MY_ASSERT (nSymbols != 0, "Pop with a numeric argument\n");
-        **code = 34;
+        **code = **code | NUM;
+        **code = **code | CMD_POP;
         (*code)++;
         **code = num;
     }
@@ -337,32 +371,40 @@ static void ram (int ** code, char * firstBracket, int numCmd)
 
 
         if (numCmd == CMD_PUSH) 
-        {                       
-            **code = 193;
+        {
+            **code = **code | RAM;
+            **code = **code | REG;
+            **code = **code | CMD_PUSH;
             (*code)++;
             **code = count_reg;
         }
 
         if (numCmd == CMD_POP)
         {
-            **code = 194;
+            **code = **code | RAM;
+            **code = **code | REG;
+            **code = **code | CMD_POP;
             (*code)++;
             **code = count_reg;
         }
     }
     
-    else if (*reg == 0 && num != -1) 
+    else if (*reg == 0 && num != -1) //push [5]
     {
         if (numCmd == CMD_PUSH) 
         {
-            **code = 161;
+            **code = **code | RAM;
+            **code = **code | NUM;
+            **code = **code | CMD_PUSH;
             (*code)++;
             **code = num;
         }
             
         if (numCmd == CMD_POP) 
         {
-            **code = 162;
+            **code = **code | RAM;
+            **code = **code | NUM;
+            **code = **code | CMD_POP;
             (*code)++;
             **code = num;
         }
@@ -378,7 +420,10 @@ static void ram (int ** code, char * firstBracket, int numCmd)
 
         if (numCmd == CMD_PUSH)
         {
-            **code = 225;
+            **code = **code | REG;
+            **code = **code | RAM;
+            **code = **code | NUM;
+            **code = **code | CMD_PUSH;
             (*code)++;
             **code = count_reg;
             (*code)++;
@@ -387,7 +432,10 @@ static void ram (int ** code, char * firstBracket, int numCmd)
 
         if (numCmd == CMD_POP)
         {
-            **code = 226;
+            **code = **code | REG;
+            **code = **code | RAM;
+            **code = **code | NUM;
+            **code = **code | CMD_POP;
             (*code)++;
             **code = count_reg;
             (*code)++;
@@ -398,15 +446,36 @@ static void ram (int ** code, char * firstBracket, int numCmd)
     free (trash);
 }
 
-static void pushSignature (FILE * dst, code_t codeFile)
+void pushSignature (char * nameBinFile, code_t codeFile)
 {
+    FILE * dst = fopen (nameBinFile, "w");
 	MY_ASSERT (dst == nullptr, "null pointer to file");
-	int * signature = (int *) calloc (SIGNATURE, sizeof(int));
-	signature[0] = 'ASM';
-	signature[1] = VERSION;
-	signature[2] = codeFile.nStrs;
-	
-	fwrite (signature, sizeof(int), 3, dst);
+
+    char * nameProg = (char *) calloc (SIGNATURE_SIZE, sizeof(char));
+    char * signature = (char *) calloc (1, SIGNATURE_SIZE*sizeof(char) + sizeof(int));
+    char * savePtrName = nameProg;
+    char * savePtrSignature = signature;
+    char version = 1;
+	*nameProg = 'A';
+    nameProg++;
+    *nameProg = 'S';
+    nameProg++;
+    *nameProg = 'M';
+    nameProg++;
+    *nameProg = version; 
+
+    memcpy (signature, savePtrName, SIGNATURE_SIZE*sizeof(char));
+    signature = signature + SIGNATURE_SIZE*sizeof(char);
+
+    int nStrings = (int) codeFile.nStrs;
+    printf (">> pushSignature: nStrings = %d\n", nStrings);
+    memcpy (signature, &nStrings, sizeof(int));
+
+	fwrite (savePtrSignature, SIGNATURE_SIZE*sizeof(char) + sizeof(int), 1, dst);
+
+    free (savePtrName);
+    free (savePtrSignature);
+    fclose (dst); //при новом открытии где будет поток файла?
 }
 
 static long int findTag (tag_t * tags, char * argument, int * startTagWithCode, int numTags)

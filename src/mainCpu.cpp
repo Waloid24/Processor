@@ -1,0 +1,17 @@
+#include "cpu.h"
+
+int main (int argc, char * argv[])
+{
+    MY_ASSERT (argc != 2, "Too few files");
+
+    FILE * binFile = codeFile (argv[1]);
+
+    int nStrs = readNumStrs (binFile);
+
+    int * code = getCode (nStrs, binFile);
+    
+    cpu (code, nStrs, MAX_RAM);
+
+    fclose (binFile);
+    return 0;
+}

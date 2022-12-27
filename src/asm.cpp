@@ -1,7 +1,13 @@
 #include "asm.h"
 
-//TODO: дописать генерацию команд
-//вернуть листинг
+#define DEF_CMD(name, numLetters, numCmd, isArg, ...)    \
+    CMD_##name = numCmd,
+
+typedef enum {
+    #include "cmd.h"
+} COMMANDS;
+
+#undef DEF_CMD
 
 const int RAM = 1 << 7; //0000 | 0001  -> 1000 | 0000
 const int REG = 1 << 6; //0000 | 0001  -> 0100 | 0000
@@ -61,12 +67,12 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t n
 
     long int tagCallOrJmps = 0;
 
-    freeCall_t * freeFunc = (freeCall_t *) calloc (numTags, sizeof(freeCall_t));
-    MY_ASSERT (freeFunc == nullptr, "Unable to allocate new memory");
-    freeCall_t * saveTagCallsOrJumps = freeFunc;
-    freeCall_t * saveTagCallsOrJumps_1 = freeFunc;
+    freeCall_t * missingTags = (freeCall_t *) calloc (numTags, sizeof(freeCall_t));
+    MY_ASSERT (missingTags == nullptr, "Unable to allocate new memory");
+    freeCall_t * saveMissingTags = missingTags;
+    freeCall_t * saveMissingTags_1 = missingTags;
 
-    #define DEF_CMD(nameCmd, countLetters, numCmd, isArg)                       \
+    #define DEF_CMD(nameCmd, countLetters, numCmd, isArg, ...)                  \
         if (myStrcmp (cmd, #nameCmd) == 0)                                      \
         {                                                                       \
             if (isArg)                                                          \
@@ -100,11 +106,11 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t n
             tagCallOrJmps = findTag (tags, nameTag, tmp, numTags);              \
             if (tagCallOrJmps == NO_TAGS)                                       \
             {                                                                   \
-                freeFunc->ptrToArrWithCode = code;                              \
-                freeFunc->tag = nameTag;                                        \
+                missingTags->ptrToArrWithCode = code;                              \
+                missingTags->tag = nameTag;                                        \
                 N_FUNC_WITHOUT_ARG++;                                           \
                 code++;                                                         \
-                freeFunc++;                                                     \
+                missingTags++;                                                     \
             }                                                                   \
             else                                                                \
             {                                                                   \
@@ -146,10 +152,10 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t n
     }
     for (int i = 0; i < N_FUNC_WITHOUT_ARG; i++)
     {
-        tagCallOrJmps = findTag (tags, saveTagCallsOrJumps->tag, tmp, numTags);
+        tagCallOrJmps = findTag (tags, saveMissingTags->tag, tmp, numTags);
         MY_ASSERT (tagCallOrJmps == NO_TAGS, "This tag does not exist");
-        *(saveTagCallsOrJumps->ptrToArrWithCode) = (int) tagCallOrJmps;
-        saveTagCallsOrJumps++;
+        *(saveMissingTags->ptrToArrWithCode) = (int) tagCallOrJmps;
+        saveMissingTags++;
     }
 
     dumpCode (arrStrs, tmp, prog->nStrs * 3);
@@ -157,8 +163,8 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t n
     fwrite (tmp, sizeof(int), prog->nStrs * 3, binFile);
 
     fclose (binFile);
-    freeArrTags (tags, saveTagCallsOrJumps_1, numTags);
-    free (saveTagCallsOrJumps_1);
+    freeArrTags (tags, saveMissingTags_1, numTags);
+    free (saveMissingTags_1);
     free (tmp);
     free (tags);
     free (cmd);

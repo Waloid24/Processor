@@ -99,24 +99,17 @@ void cpu (int * code, size_t nStrs, size_t numTags)
 
     int * regs = createArrRegs (NUM_REGISTERS);
     int cmd = -1;
+
+    #define DEF_CMD(nameCmd, length, numCmd, isArg, ...)    \
+    if (cmd == CMD_##nameCmd)                               \
+        __VA_ARGS__                                         \
+    else                                                
+
     for (size_t i = 0; i < nStrs * 3; i++)
     {
         cmd = (code[i] & MASK);
-        // printf ("code[i] & NUM = %d\n", code[i] & NUM);
-        // printf ("code[i] & REG = %d\n", code[i] & REG);
-        // printf ("code[i] & RAM = %d\n", code[i] & RAM);
 
-        if (code[i] == CMD_MEOW)
-        {
-            fprintf (stdout, "meow\n");
-        }
-        else if (code[i] == CMD_HLT) //hlt
-        {
-            stack_dtor (&stk);
-            stack_dtor (&callStack);
-            break;
-        }
-        else if ((cmd == CMD_PUSH) && 
+        if ((cmd == CMD_PUSH) && 
                 (checkBit(code[i], NUM) == 1) && 
                 (checkBit(code[i], REG) == 0) && 
                 (checkBit(code[i], RAM) == 0)) //push 7 == 0010|0001
@@ -231,9 +224,7 @@ void cpu (int * code, size_t nStrs, size_t numTags)
                 (checkBit(code[i], RAM) == 1)) //pop [5 + rcx]
         {
             i++;
-            printf ("in cpu: i = %zu\n", i);
             int nReg = code[i];
-            printf ("in cpu: nReg = %d\n", nReg);
             MY_ASSERT (nReg > NUM_REGISTERS-1, "You are out of register memory");
             i++;
             int value1 = regs[nReg];
@@ -242,85 +233,8 @@ void cpu (int * code, size_t nStrs, size_t numTags)
             MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             ram[ramIndex] = stack_pop (&stk, logfile);
         }
-        
-        else if (cmd == CMD_ADD) //add
-        {
-            int n1 = stack_pop (&stk, logfile);
-            int n2 = stack_pop (&stk, logfile);
-            stack_push (&stk, n1 + n2, logfile);
-        }
-        else if (cmd == CMD_SUB) //sub
-        {
-            int n1 = stack_pop (&stk, logfile);
-            int n2 = stack_pop (&stk, logfile);
-            stack_push (&stk, n1 - n2, logfile);
-        }
-        else if (cmd == CMD_MUL) //mul
-        {
-            int n1 = stack_pop (&stk, logfile);
-            int n2 = stack_pop (&stk, logfile);
-            stack_push (&stk, n1 * n2, logfile);
-        }
-        else if (cmd == CMD_DIV) //div
-        {
-            int n1 = stack_pop (&stk, logfile);
-            int n2 = stack_pop (&stk, logfile);
-            stack_push (&stk, n1 / n2, logfile);
-        }
-        else if (cmd == CMD_OUT) //out
-        {
-            fprintf (stdout, "OUT: %d\n", stack_pop (&stk, logfile));
-        }
-        else if (cmd == CMD_IN) // in
-        {
-            int tmp = getNum ();
-            stack_push (&stk, tmp, logfile);
-            stack_dump (stk, logfile);
-        }
-        else if (cmd == CMD_JMP) //jmp
-        {
-            i++;
-            int ptrToJmp = code[i];
-            i = ((size_t) ptrToJmp)-1;
-        }
-        else if (cmd == CMD_JA) //ja  
-        {
-            JUMP_FORM (>)
-        }
-        else if (cmd == CMD_JB) //jb
-        {
-            JUMP_FORM(<)
-        }
-        else if (cmd == CMD_JBE) //jbe
-        {
-            JUMP_FORM(<=)
-        }
-        else if (cmd == CMD_JGE) //jge
-        {
-            JUMP_FORM (>=)
-        }
-        else if (cmd == CMD_JE) //je
-        {
-            JUMP_FORM (==)
-        }
-        else if (cmd == CMD_CALL) //call
-        {
-            i++;
-            int ptrToJmp = code[i];
-            stack_push (&callStack, ((int)i) + 1, logCallStack);
-            i = (size_t) ptrToJmp-1;
-        }
-        else if (cmd == CMD_RET) //RET
-        {
-            i = (size_t) stack_pop (&callStack, logCallStack) - 1;
-        }
-        else if (cmd == CMD_SQRT)
-        {
-            int tmp = stack_pop (&stk, logfile);
-            int result = (int) sqrt ((double) tmp);
-            stack_push (&stk, result, logfile);
-        }
-        else 
+        else
+        #include "cmd.h"
         {
             stack_dtor (&stk);
             stack_dtor (&callStack);

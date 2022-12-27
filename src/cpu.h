@@ -4,7 +4,15 @@
 #include <stdio.h>
 #include <math.h>
 #include "stack.h"
-#include "asm.h"
+
+#define DEF_CMD(name, numLetters, numCmd, isArg, ...)    \
+    CMD_##name = numCmd,
+
+typedef enum {
+    #include "cmd.h"
+} COMMANDS;
+
+#undef DEF_CMD
 
 const size_t MAX_RAM = 100;
 const int MASK = (1<<4) + (1<<3) + (1<<2) + (1<<1) + 1; //0001|1111

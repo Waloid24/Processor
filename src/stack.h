@@ -19,7 +19,7 @@ struct info_log_t {
 typedef struct {
     hash_t          hashsum_stack;
     elem_t     *    data;
-    size_t          n_memb;
+    int             n_memb; //size_t
     size_t          capacity;
     const char *    name;
     size_t          min_capacity; 

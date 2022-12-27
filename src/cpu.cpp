@@ -9,7 +9,7 @@
     if (n1 sign n2)                                 \
     {                                               \
         int ptrToJmp = code[i];                     \
-        i = ptrToJmp-1;                             \
+        i = ((size_t) ptrToJmp) - 1;                \
         stack_push (&stk, n2, logfile);             \
         stack_push (&stk, n1, logfile);             \
     }                                               \
@@ -28,10 +28,8 @@ int NUM = 5; //0000 | 0001  -> 0010 | 0000
 
 static int getNum (void);
 static int * createArrRegs (size_t numRegs);
-static int * createArrCode (int nStrs);
+static int * createArrCode (size_t nStrs);
 static int checkBit(const int value, const int position);
-static void printBinaryForm (int count, const char * text);
-
 
 FILE * codeFile (char * nameFile)
 {
@@ -42,7 +40,7 @@ FILE * codeFile (char * nameFile)
     return binFile;
 }
 
-int readNumStrs (FILE * binFile)
+size_t readNumStrs (FILE * binFile)
 {
     MY_ASSERT (binFile == nullptr, "There is no access to binary file");
 
@@ -53,25 +51,26 @@ int readNumStrs (FILE * binFile)
     printf ("in getCode: nStrs = %d\n", nStrs);
     MY_ASSERT (nStrs < 0, "The file is empty");
 
-    return nStrs;
+    return (size_t)nStrs;
 }
 
-void dumpCode (int * code, int numElem)
+void dumpCode (int * code, size_t numElem)
 {
     FILE * logfile = fopen ("logCodeCPU.txt", "a");
     MY_ASSERT (code == nullptr, "There is no access to this code");
 
     fprintf (logfile, "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 
-    for (int i = 0; i < numElem; i++)
+    for (size_t i = 0; i < numElem; i++)
     {
-        fprintf (logfile, "code[%d] = %d\n", i, code[i]);
+        fprintf (logfile, "code[%zu] = %d\n", i, code[i]);
     }
 
     fprintf (logfile, "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+    fclose (logfile);
 }
 
-int * getCode (int nStrs, FILE * binFile)
+int * getCode (size_t nStrs, FILE * binFile)
 {
     int * code = createArrCode (nStrs);
     fread (code, sizeof(int), nStrs * 3, binFile);
@@ -79,7 +78,7 @@ int * getCode (int nStrs, FILE * binFile)
     return code;
 }
 
-void cpu (int * code, int nStrs, int numTags)
+void cpu (int * code, size_t nStrs, size_t numTags)
 {
     MY_ASSERT (code == nullptr, "Unable to access to array with code");
 
@@ -88,7 +87,7 @@ void cpu (int * code, int nStrs, int numTags)
 
     dumpCode (code, nStrs*3);
 
-    setbuf (logfile, NULL);
+    // setbuf (logfile, NULL);
 
     stack_t callStack = {};
     stk_ctor (&callStack, numTags, "callStk");
@@ -100,7 +99,7 @@ void cpu (int * code, int nStrs, int numTags)
 
     int * regs = createArrRegs (NUM_REGISTERS);
     int cmd = -1;
-    for (int i = 0; i < nStrs * 3; i++)
+    for (size_t i = 0; i < nStrs * 3; i++)
     {
         cmd = (code[i] & MASK);
         // printf ("code[i] & NUM = %d\n", code[i] & NUM);
@@ -174,7 +173,7 @@ void cpu (int * code, int nStrs, int numTags)
         {
             i++;
             int ramIndex = code[i];
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             stack_push (&stk, ram[ramIndex], logfile);
         }
         else if ((cmd == CMD_POP) && 
@@ -184,7 +183,7 @@ void cpu (int * code, int nStrs, int numTags)
         {
             i++;
             int ramIndex = code[i];
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             ram[ramIndex] = stack_pop (&stk, logfile);
         }
         else if ((cmd == CMD_PUSH) && 
@@ -196,7 +195,7 @@ void cpu (int * code, int nStrs, int numTags)
             int nReg = code[i];
             MY_ASSERT (nReg > NUM_REGISTERS-1, "You are out of register memory");
             int ramIndex = regs[nReg];
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             stack_push (&stk, ram[ramIndex], logfile);
         }
         else if ((cmd == CMD_POP) && 
@@ -208,7 +207,7 @@ void cpu (int * code, int nStrs, int numTags)
             int nReg = code[i];
             MY_ASSERT (nReg > NUM_REGISTERS-1, "You are out of register memory");
             int ramIndex = regs[nReg];
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             ram[ramIndex] = stack_pop (&stk, logfile);
         }
         else if ((cmd == CMD_PUSH) && 
@@ -223,7 +222,7 @@ void cpu (int * code, int nStrs, int numTags)
             int value1 = regs[nReg];
             int value2 = code[i];
             int ramIndex = value1 + value2;
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             stack_push (&stk, ram[ramIndex], logfile);
         }
         else if ((cmd == CMD_POP) && 
@@ -232,13 +231,15 @@ void cpu (int * code, int nStrs, int numTags)
                 (checkBit(code[i], RAM) == 1)) //pop [5 + rcx]
         {
             i++;
+            printf ("in cpu: i = %zu\n", i);
             int nReg = code[i];
+            printf ("in cpu: nReg = %d\n", nReg);
             MY_ASSERT (nReg > NUM_REGISTERS-1, "You are out of register memory");
             i++;
             int value1 = regs[nReg];
             int value2 = code[i];
             int ramIndex = value1 + value2;
-            MY_ASSERT (ramIndex > MAX_RAM-1, "You are out of RAM");
+            MY_ASSERT ((size_t) ramIndex > MAX_RAM-1, "You are out of RAM");
             ram[ramIndex] = stack_pop (&stk, logfile);
         }
         
@@ -280,7 +281,7 @@ void cpu (int * code, int nStrs, int numTags)
         {
             i++;
             int ptrToJmp = code[i];
-            i = ptrToJmp-1;
+            i = ((size_t) ptrToJmp)-1;
         }
         else if (cmd == CMD_JA) //ja  
         {
@@ -306,12 +307,12 @@ void cpu (int * code, int nStrs, int numTags)
         {
             i++;
             int ptrToJmp = code[i];
-            stack_push (&callStack, i+1, logCallStack);
-            i = ptrToJmp-1;
+            stack_push (&callStack, ((int)i) + 1, logCallStack);
+            i = (size_t) ptrToJmp-1;
         }
         else if (cmd == CMD_RET) //RET
         {
-            i = stack_pop (&callStack, logCallStack) - 1;
+            i = (size_t) stack_pop (&callStack, logCallStack) - 1;
         }
         else if (cmd == CMD_SQRT)
         {
@@ -322,7 +323,7 @@ void cpu (int * code, int nStrs, int numTags)
         else 
         {
             stack_dtor (&stk);
-            // stack_dtor (&callStack);
+            stack_dtor (&callStack);
             break;
         }
     }
@@ -355,10 +356,8 @@ static int * createArrRegs (size_t numRegs)
     return regs;
 }
 
-static int * createArrCode (int nStrs)
+static int * createArrCode (size_t nStrs)
 {
-    MY_ASSERT (nStrs < 0, "The file is empty");
-
     int * code = (int *) calloc (nStrs * 3, sizeof (int));
     MY_ASSERT (code == nullptr, "Unable to allocate new memory");
 
@@ -368,34 +367,4 @@ static int * createArrCode (int nStrs)
 static int checkBit(const int value, const int position) 
 {
     return ((value & (1 << position)) != 0);
-}
-
-static void printBinaryForm (int count, const char * text)
-{
-    const int NUM_BITS = 8;
-    char * arrDigit = (char *) calloc (NUM_BITS, sizeof(char));
-    MY_ASSERT (arrDigit == nullptr, "Unable to allocate new memory");
-
-    for (int i = 0; i < NUM_BITS; i++)
-    {
-        if (checkBit(count, i))
-        {
-            arrDigit[i] = 1;
-        }
-        else
-        {
-            arrDigit[i] = 0;
-        }
-    }
-    printf (text);
-    printf (" = %d = ", count);
-    for (int i = NUM_BITS; i > 0; i--)
-    {
-        if (i == 4)
-        {
-            printf ("|");
-        }
-        printf ("%d", arrDigit[i-1]);
-    }
-    printf ("\n");
 }

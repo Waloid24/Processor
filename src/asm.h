@@ -56,7 +56,8 @@ struct freeCall {
 };
 typedef struct freeCall freeCall_t;
 
-void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags);
+void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t numTags);
 void pushSignature (char * nameBinFile, code_t code);
+void dumpCode (char ** arrStrs, int * code, size_t numElem);
 
 #endif

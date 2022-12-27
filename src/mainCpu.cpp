@@ -6,7 +6,7 @@ int main (int argc, char * argv[])
 
     FILE * binFile = codeFile (argv[1]);
 
-    int nStrs = readNumStrs (binFile);
+    size_t nStrs = readNumStrs (binFile);
 
     int * code = getCode (nStrs, binFile);
     

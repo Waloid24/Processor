@@ -2,10 +2,9 @@
 
 static size_t size (const char * arg_console);
 static void writeTextToBuf (code_t * code, FILE * codeFile);
-static int correctBuf (char * buf, int nElements);
-static char ** arrPtrToStrings (int nStrs, size_t size);
-static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t code);
-static void removeSpaces (char * dest, const char * source);
+static size_t correctBuf (char * buf, size_t nElements);
+static char ** arrPtrToStrings (size_t nStrs, size_t size);
+static void fillArr (char ** arrPtrsToStrings, char * buf, size_t nElem, code_t code);
 static void skipSpace (char ** strCode, int countLetters);
 
 code_t readCode (const char * nameFile)
@@ -30,9 +29,9 @@ code_t readCode (const char * nameFile)
 static size_t size (const char * argConsole)
 {
     struct stat code = {};
-    size_t val = stat (argConsole, &code);
+    stat (argConsole, &code);
 
-    return code.st_size;
+    return (size_t) code.st_size;
 }
 
 static void writeTextToBuf (code_t * code, FILE * codeFile)
@@ -43,15 +42,15 @@ static void writeTextToBuf (code_t * code, FILE * codeFile)
     code->buf = (char *) calloc (code->sizeFile + 1, sizeof(char));
     MY_ASSERT (code->buf == nullptr, "Unable to allocate new memory");
 
-    size_t read_ok = fread (code->buf, sizeof(char), code->sizeFile,  codeFile);
+    fread (code->buf, sizeof(char), code->sizeFile,  codeFile);
     (code->buf)[code->sizeFile] = '\0';
 }
 
-static int correctBuf (char * buf, int nElements) 
+static size_t correctBuf (char * buf, size_t nElements) 
 {
-	int nStrings = 0;
+	size_t nStrings = 0;
 
-	for (int i = 0; i < nElements; i++) 
+	for (size_t i = 0; i < nElements; i++) 
 	{   
         if (buf[i] == ';')
         {
@@ -72,18 +71,18 @@ static int correctBuf (char * buf, int nElements)
 	return nStrings;
 }
 
-static char ** arrPtrToStrings (int nStrs, size_t size)
+static char ** arrPtrToStrings (size_t nStrs, size_t size)
 {
 	char ** array = (char **) calloc (nStrs, size);
 	MY_ASSERT (array == NULL, "Memory allocation error\n");
 	return array;
 }
 
-static void fillArr (char ** arrPtrsToStrings, char * buf, int nElem, code_t code) 
+static void fillArr (char ** arrPtrsToStrings, char * buf, size_t nElem, code_t code) 
 {
     skipSpace (&buf, 0);
 	arrPtrsToStrings[0] = buf;
-	for (int nSym = 0, j = 1; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++)
+	for (size_t nSym = 0, j = 1; nSym < nElem && j < code.nStrs && *buf != EOF; nSym++)
 	{
 		if (*buf == '\0')
 		{

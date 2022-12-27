@@ -20,8 +20,8 @@ void stack_ctor (stack_t * stk, size_t capacity, const char * name_stk,
     char * data = (char *) calloc (2*sizeof(canary_t) + (stk->capacity)*sizeof(elem_t), sizeof(char));
 
     stk -> ptr_canary_hashsum  = (canary_t *) data;
-    stk -> data = (elem_t *) ((char *)data + sizeof(canary_t));
-    stk -> ptr_canary_data = (canary_t *) ((char *)data + sizeof(canary_t) + (stk->capacity)*sizeof(elem_t));
+    stk -> data = (elem_t *) (data + sizeof(canary_t));
+    stk -> ptr_canary_data = (canary_t *) (data + sizeof(canary_t) + (stk->capacity)*sizeof(elem_t));
     *(stk -> ptr_canary_data) = BUF_CNR_SCND;
 
     for (size_t i = 0; i < stk->capacity; i++)
@@ -40,7 +40,7 @@ void stack_push (stack_t * stk, elem_t new_memb, FILE * log)
     MY_ASSERT (stk == nullptr, "No stack access");
     MY_ASSERT (log == nullptr, "There is no access to logfile");
     
-    if (stk->n_memb >= stk->capacity)
+    if (stk->n_memb >= (int) stk->capacity)
     {
         stack_resize (stk, INCREASE);
     }
@@ -66,7 +66,7 @@ elem_t stack_pop (stack_t * stk, FILE * log)
         (stk->data)[stk->n_memb] = POISON_ELEM_STK;
     }
     
-    if (THRESHOLD_RATIO*(stk->n_memb) <= stk->capacity && (stk->capacity/RESIZE) >= (stk -> min_capacity)) 
+    if (THRESHOLD_RATIO*(stk->n_memb) <= (int) stk->capacity && (stk->capacity/RESIZE) >= (stk -> min_capacity)) 
     {
         stack_resize(stk, REDUCE);
     }
@@ -119,14 +119,14 @@ void stack_dump (stack_t stk, FILE * log_file)
     fprintf (log_file, "In data:");
     for (size_t i = 0; i < stk.capacity; i++)
     {
-        fprintf (log_file, "%X, ", *((elem_t*)((char *)stk.data + i * sizeof(elem_t))));
+        fprintf (log_file, "%d, ", *((elem_t*)((char *)stk.data + i * sizeof(elem_t))));
     }
     fprintf (log_file, "\n");
     fprintf (log_file, "Second canary in data: %llX\n", *(stk.ptr_canary_data));
 
     
     //printf ("5\n");
-    fprintf (log_file, "\nNumber of members = %zu, capacity = %zu\n", stk.n_memb, stk.capacity);
+    fprintf (log_file, "\nNumber of members = %d, capacity = %zu\n", stk.n_memb, stk.capacity);
     fprintf (log_file, "stk was created in file = %s, in func = %s, in strings = %zu\n", stk.name_file_create, stk.name_func_create, stk.line_create);
     fprintf (log_file, LONG_LINE);
     fflush  (log_file);
@@ -141,11 +141,6 @@ size_t dump_call_num (void)
 
 void * stack_recalloc (void * memblock, size_t n_memb, size_t size_memb)
 {
-    if (n_memb < 0)
-    {
-        free (memblock);
-        return memblock;
-    }
     if (memblock == nullptr)
     {
         return calloc (n_memb, size_memb);        
@@ -174,9 +169,9 @@ void stack_resize (stack_t * stk, int mode)
 
         MY_ASSERT (stk->ptr_canary_hashsum == nullptr, "New pointer after resize is nullptr");
 
-        for (int i = 0; i < (stk->capacity - stk->n_memb); i++)
+        for (int i = 0; i < ((int)stk->capacity - stk->n_memb); i++)
         {
-            *((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) = POISON_ELEM_STK;
+            *(stk->data + i + stk->n_memb) = POISON_ELEM_STK;
         }
 
         //stk->ptr_canary_hashsum = (canary_t *) ptr;
@@ -201,15 +196,11 @@ void stack_resize (stack_t * stk, int mode)
 
         MY_ASSERT (stk->ptr_canary_hashsum == nullptr, "New pointer after resize is nullptr");
 
-        for (int i = 0; i < (stk->capacity - stk->n_memb); i++)
+        for (int i = 0; i < ((int)stk->capacity - stk->n_memb); i++)
         {
-            *((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) = POISON_ELEM_STK;
+            *(stk->data + i + stk->n_memb) = POISON_ELEM_STK;
         }
 
-        //stk->ptr_canary_hashsum = (canary_t *) ptr;
-        //printf ("in resize after recalloc stk->ptr_canary_data = %p\n", stk->ptr_canary_data);
-        //printf ("The value of stk->ptr_canary_data AFTER resize = %llX\n", *(stk->ptr_canary_data));
-        //check_err (); stk->data != nullptr
     }
     else 
     {
@@ -225,9 +216,7 @@ void stack_hash_sum (stack_t * stk)
     MY_ASSERT (stk == nullptr, "There is no access to stack");
 
     *(stk -> ptr_canary_hashsum) = calculate_hash (stk->data, sizeof(sizeof(hash_t) + (stk->capacity)*sizeof(elem_t)));
-    //printf ("Hashsum of data = %llX\n", *(stk -> ptr_canary_hashsum));
     stk -> hashsum_stack = calculate_hash ((char*)stk + (char) sizeof (canary_t), sizeof(stack_t)-sizeof(canary_t));
-    //printf ("Hashsum of stk = %llX\n", stk -> hashsum_stack);
 }
 
 hash_t calculate_hash (void * object, size_t byte_size)
@@ -237,14 +226,15 @@ hash_t calculate_hash (void * object, size_t byte_size)
     char * start_ptr = (char *) object;
     hash_t hash_sum = 0xDED60D;
 
-    for (char i = 0; i < byte_size; i++)
+    for (char i = 0; (size_t) i < byte_size; i++)
     {
-        hash_sum += i * start_ptr[i];
+        hash_sum += (unsigned long long) (i * (*start_ptr));
+        start_ptr++;
     }
 
     return hash_sum;
 }
-// ^^^^^^^^^^^^^^^
+
 int struct_validator (stack_t * stk, FILE * log)
 {
     log_ok ();
@@ -258,7 +248,7 @@ int struct_validator (stack_t * stk, FILE * log)
         fclose (log);
         err_sum |= PTR_STK_NULL;
     }
-    if (stk->n_memb > stk->capacity)
+    if (stk->n_memb > (int)stk->capacity)
     {
         //printf ("stk->n_memb > stk->capacity\n");
         LOGDUMP(YES, log, stk, "The number of members in the buffer is greater than its capacity", YES);
@@ -318,9 +308,9 @@ int struct_validator (stack_t * stk, FILE * log)
         fclose (log);
         err_sum |= BAD_STK_CAN_SCND;
     }
-    for (int i = 0; i < (stk->capacity - stk->n_memb); i++)
+    for (int i = 0; i < ((int)stk->capacity - stk->n_memb); i++)
     {
-        if (*((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) != POISON_ELEM_STK)
+        if (*(stk->data + i + stk->n_memb) != POISON_ELEM_STK)
         {
             //printf ("*((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb) = %d\n", *((elem_t *)stk->data + (elem_t)i + (elem_t)stk->n_memb));
             //printf ("Poison isn't poison! ^_^\n");
@@ -420,7 +410,7 @@ void logdump_hidden (unsigned char can_print, FILE * stack_log, stack_t * stk, c
     if (is_err)
     {
         fprintf (stack_log, LONG_LINE);
-        fprintf (stack_log, "%s at %s(%d)\n", call_func, call_file, call_line);
+        fprintf (stack_log, "%s at %s(%u)\n", call_func, call_file, call_line);
         fprintf (stack_log, "Stack[%p](%d) \"%s\" was created in file %s in function %s(str %zu)\n", 
                     stk, is_err, stk->name ,stk->name_file_create, stk->name_func_create, stk->line_create);
         fprintf (stack_log, "%s\n", message);
@@ -442,7 +432,7 @@ FILE * open_logfile (const char * name_logfile)
     FILE * log = fopen (name_logfile, "a");
     MY_ASSERT (log == nullptr, "There is no access to logfile");
 
-    //setbuf (log, nullptr);
+    setbuf (log, nullptr);
 
     return log;
 }

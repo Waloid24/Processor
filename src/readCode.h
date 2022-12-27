@@ -9,7 +9,7 @@ struct codeInfo
 {
     size_t sizeFile;
     char * buf;
-    int nStrs;
+    size_t nStrs;
     char ** arrStrs;
 };
 typedef struct codeInfo code_t;

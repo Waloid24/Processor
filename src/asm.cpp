@@ -1,13 +1,11 @@
 #include "asm.h"
 
 //TODO: дописать генерацию команд
-//очистить память
 //вернуть листинг
-//добавить все флаги, обработать warnings
 
-int RAM = 1 << 7; //0000 | 0001  -> 1000 | 0000
-int REG = 1 << 6; //0000 | 0001  -> 0100 | 0000
-int NUM = 1 << 5; //0000 | 0001  -> 0010 | 0000
+const int RAM = 1 << 7; //0000 | 0001  -> 1000 | 0000
+const int REG = 1 << 6; //0000 | 0001  -> 0100 | 0000
+const int NUM = 1 << 5; //0000 | 0001  -> 0010 | 0000
 
 const int SIGNATURE_SIZE = 4;
 
@@ -20,14 +18,15 @@ enum {
     YES = 1
 };
 
-static void scanTag (char * src, char * dst, int lengthSrc);
+static void scanTag (char * src, char * dst, size_t lengthSrc);
 static int findFreePlace (tag_t * tags, int sizeArrTags);
-static long int findTag (tag_t * tags, char * argument, int * startArrWithCode, int numTags);
+static long int findTag (tag_t * tags, char * argument, int * startArrWithCode, size_t numTags);
 static void ram (int ** code, char * firstBracket, int numCmd);
-static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags);
-static void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, tag_t * tags);
+static void no_ram (int ** code, char * strCode, int countLetters, int numCmd);
+static void getArg (int ** code, char * str_text_code, int countLetters, int numCmd);
+static void freeArrTags (tag_t * tags, freeCall_t * calls, size_t sizeArrTags);
 
-void dumpCode (char ** arrStrs, int * code, int numElem, int nStrs)
+void dumpCode (char ** arrStrs, int * code, size_t numElem)
 {
     MY_ASSERT (code == nullptr, "There is no access to this code");
     MY_ASSERT (arrStrs == nullptr, "There is no access to array with strings");
@@ -35,15 +34,17 @@ void dumpCode (char ** arrStrs, int * code, int numElem, int nStrs)
     FILE * logfile = fopen ("logCode.txt", "a");
     fprintf (logfile, "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 
-    for (int i = 0; i < numElem; i++)
+    for (size_t i = 0; i < numElem; i++)
     {
-        fprintf (logfile, "code[%d] = %d\n", i, code[i]);
+        fprintf (logfile, "code[%lu] = %d\n", i, code[i]);
     }
 
     fprintf (logfile, "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+
+    fclose (logfile);
 }
 
-void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numTags)
+void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, size_t numTags)
 {
     MY_ASSERT (arrStrs == nullptr, "There is no access to array of strings");
     MY_ASSERT (prog == nullptr, "There is no access to struct with information about code file");
@@ -58,13 +59,12 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
     int * code = (int *) calloc (prog->nStrs * 3, sizeof(int));
     int * tmp = code;
 
-    int isTag = 0;
     long int tagCallOrJmps = 0;
-    int tagJmp = 0;
 
     freeCall_t * freeFunc = (freeCall_t *) calloc (numTags, sizeof(freeCall_t));
     MY_ASSERT (freeFunc == nullptr, "Unable to allocate new memory");
     freeCall_t * saveTagCallsOrJumps = freeFunc;
+    freeCall_t * saveTagCallsOrJumps_1 = freeFunc;
 
     #define DEF_CMD(nameCmd, countLetters, numCmd, isArg)                       \
         if (myStrcmp (cmd, #nameCmd) == 0)                                      \
@@ -72,7 +72,7 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
             if (isArg)                                                          \
             {                                                                   \
                 countArgs++;                                                    \
-                getArg (&code, arrStrs[i], countLetters, numCmd, tags);         \
+                getArg (&code, arrStrs[i], countLetters, numCmd);               \
                 code++;                                                         \
             }                                                                   \
             else                                                                \
@@ -92,7 +92,7 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
                                                                                 \
             skipSpace (&(arrStrs[i]), length);                                  \
                                                                                 \
-            int lengthTag = strlen (arrStrs[i]);                                \
+            size_t lengthTag = strlen (arrStrs[i]);                             \
                                                                                 \
             char * nameTag = (char *) calloc (lengthTag, sizeof(char));         \
             scanTag (arrStrs[i], nameTag, lengthTag);                           \
@@ -108,7 +108,7 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
             }                                                                   \
             else                                                                \
             {                                                                   \
-                *code = tagCallOrJmps;                                          \
+                *code = (int) tagCallOrJmps;                                    \
                 code++;                                                         \
                 free (nameTag);                                                 \
             }                                                                   \
@@ -119,16 +119,16 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
     MY_ASSERT (cmd == nullptr, "Unable to allocate new memory");
 
     int countArgs = 0;
-    for (int i = 0, ip = -1; i < prog->nStrs; i++)
+    for (size_t i = 0; i < prog->nStrs; i++) //, ip = -1
     {
         sscanf (arrStrs[i], "%s", cmd);
 
         if (strchr (cmd, ':') != nullptr) 
         {
-            int freeTag = findFreePlace (tags, numTags);
+            int freeTag = findFreePlace (tags, (int) numTags);
             MY_ASSERT (freeTag == -1, "There are no free cells in the tag array");
 
-            int lengthSrc = strlen (cmd);
+            size_t lengthSrc = strlen (cmd);
 
             tags[freeTag].nameTag = (char *) calloc (lengthSrc, sizeof(char));
             MY_ASSERT (tags[freeTag].nameTag == nullptr, "Unable to allocate new memory");
@@ -140,7 +140,7 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
         #include "jmps.h"
         #include "cmd.h"
         {
-            fprintf (stderr, "command undifined is \"%s\" (arrStrs[%d])\n", arrStrs[i], i);
+            fprintf (stderr, "command undifined is \"%s\" (arrStrs[%lu])\n", arrStrs[i], i);
             MY_ASSERT (1, "This command is not defined.\n");
         }
     }
@@ -148,15 +148,19 @@ void createBinFile (char ** arrStrs, code_t * prog, char * nameBinFile, int numT
     {
         tagCallOrJmps = findTag (tags, saveTagCallsOrJumps->tag, tmp, numTags);
         MY_ASSERT (tagCallOrJmps == NO_TAGS, "This tag does not exist");
-        *(saveTagCallsOrJumps->ptrToArrWithCode) = tagCallOrJmps;
+        *(saveTagCallsOrJumps->ptrToArrWithCode) = (int) tagCallOrJmps;
         saveTagCallsOrJumps++;
     }
 
-    dumpCode (arrStrs, tmp, prog->nStrs * 3, prog->nStrs);
+    dumpCode (arrStrs, tmp, prog->nStrs * 3);
 
     fwrite (tmp, sizeof(int), prog->nStrs * 3, binFile);
 
     fclose (binFile);
+    freeArrTags (tags, saveTagCallsOrJumps_1, numTags);
+    free (saveTagCallsOrJumps_1);
+    free (tmp);
+    free (tags);
     free (cmd);
     #undef DEF_CMD
 }
@@ -165,7 +169,7 @@ static int findFreePlace (tag_t * tags, int sizeArrTags)
 {
     for (int i = 0; i < sizeArrTags; i++)
     {
-        if (tags[i].ptr == 0)
+        if (tags[i].ptr == nullptr) //0
         {
             return i;
         }
@@ -173,9 +177,26 @@ static int findFreePlace (tag_t * tags, int sizeArrTags)
     return -1;
 }
 
-static void scanTag (char * src, char * dst, int lengthSrc)
+static void freeArrTags (tag_t * tags, freeCall_t * calls, size_t sizeArrTags)
 {
-    for (int i = 0; i < lengthSrc; i++)
+    MY_ASSERT (tags == nullptr, "No access to the tag array");
+    for (size_t i = 0; i < sizeArrTags; i++)
+    {
+        if (tags[i].ptr != nullptr)
+        {
+            free (tags[i].nameTag);
+        }
+    }
+    for (size_t i = 0; i < sizeArrTags && calls->tag != nullptr; i++)
+    {
+        free (calls->tag);
+        calls++;
+    }
+}
+
+static void scanTag (char * src, char * dst, size_t lengthSrc)
+{
+    for (size_t i = 0; i < lengthSrc; i++)
     {
         if (*src == ':' || *src == ';')
         {
@@ -195,7 +216,7 @@ static void scanTag (char * src, char * dst, int lengthSrc)
     }
 }
 
-static void getArg (int ** code, char * str_text_code, int countLetters, int numCmd, tag_t * tags)
+static void getArg (int ** code, char * str_text_code, int countLetters, int numCmd)
 {
 	char * firstBracket = nullptr;
     if ((firstBracket = strchr (str_text_code, '[')) != nullptr)
@@ -204,11 +225,11 @@ static void getArg (int ** code, char * str_text_code, int countLetters, int num
     }
     else
 	{
-        no_ram(code, str_text_code, countLetters, numCmd, tags);
+        no_ram(code, str_text_code, countLetters, numCmd);
 	}
 }
 
-static void no_ram (int ** code, char * strCode, int countLetters, int numCmd, tag_t * tags)
+static void no_ram (int ** code, char * strCode, int countLetters, int numCmd) //, tag_t * tags
 {
     skipSpace (&strCode, countLetters);
     char * ptrToArg = strCode;
@@ -467,8 +488,8 @@ void pushSignature (char * nameBinFile, code_t codeFile)
     memcpy (signature, savePtrName, SIGNATURE_SIZE*sizeof(char));
     signature = signature + SIGNATURE_SIZE*sizeof(char);
 
-    int nStrings = (int) codeFile.nStrs;
-    printf (">> pushSignature: nStrings = %d\n", nStrings);
+    size_t nStrings = codeFile.nStrs;
+    printf (">> pushSignature: nStrings = %lu\n", nStrings);
     memcpy (signature, &nStrings, sizeof(int));
 
 	fwrite (savePtrSignature, SIGNATURE_SIZE*sizeof(char) + sizeof(int), 1, dst);
@@ -478,10 +499,10 @@ void pushSignature (char * nameBinFile, code_t codeFile)
     fclose (dst); //при новом открытии где будет поток файла?
 }
 
-static long int findTag (tag_t * tags, char * argument, int * startTagWithCode, int numTags)
+static long int findTag (tag_t * tags, char * argument, int * startTagWithCode, size_t numTags)
 {
     MY_ASSERT (tags == nullptr, "There is no access to array with tags");
-    for (int i = 0; i < numTags; i++)
+    for (size_t i = 0; i < numTags; i++)
     {
         if (tags[i].nameTag != nullptr && myStrcmp (argument, tags[i].nameTag) == 0)
         {
